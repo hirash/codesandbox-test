@@ -196,6 +196,13 @@
     animation:bob 1.4s ease-in-out infinite;}
   .celebrate-card .dollstage svg:nth-child(2){animation-delay:.2s;}
   .celebrate-card .dollstage svg:nth-child(3){animation-delay:.4s;}
+  .reward-img{
+    display:block; margin:0 auto clamp(10px,1.6vw,18px); max-width:min(52vw,340px);
+    max-height:min(42vh,340px); width:auto; border-radius:26px; object-fit:contain;
+    box-shadow:var(--shadow-lg); border:5px solid #fff; background:#fff;
+    animation:cardpop .5s cubic-bezier(.2,1.4,.5,1);
+  }
+  .reward-hint{font-size:clamp(12px,1.5vw,16px); color:var(--ink-soft); font-weight:700; margin:.2em auto 1em; max-width:26em;}
   @keyframes bob{50%{transform:translateY(-12px) rotate(-4deg);}}
   .celebrate-card button{
     font-family:inherit; font-weight:800; font-size:clamp(16px,2vw,22px); color:#fff;
@@ -249,6 +256,8 @@
 
     <div class="resetrow">
       <button class="reset" id="resetBtn" type="button">🔄 ぜんぶ りせっと</button>
+      <button class="reset" id="rewardBtn" type="button">🖼 ごほうびの え を えらぶ</button>
+      <input type="file" id="rewardInput" accept="image/*" hidden />
     </div>
   </section>
 
@@ -273,13 +282,15 @@
   <!-- ================= CELEBRATION ================= -->
   <div id="celebrate" role="dialog" aria-label="おめでとう">
     <div class="celebrate-card">
+      <img id="rewardImg" class="reward-img" alt="ごほうびの え" hidden />
       <div class="dollstage">
         <svg viewBox="0 0 100 100"><use href="#doll-bunny"/></svg>
         <svg viewBox="0 0 100 100"><use href="#doll-bear"/></svg>
         <svg viewBox="0 0 100 100"><use href="#doll-cat"/></svg>
       </div>
       <h2>ぜんぶ できたね！</h2>
-      <p>すごい！ にんぎょうさんたちも よろこんでるよ 🎉</p>
+      <p id="celebMsg">すごい！ にんぎょうさんたちも よろこんでるよ 🎉</p>
+      <p id="rewardHint" class="reward-hint">したの「🖼 ごほうびの え を えらぶ」で すきな キャラクターを いれると ここに でてくるよ</p>
       <button type="button" id="celebClose">やったー！</button>
     </div>
   </div>
@@ -467,16 +478,73 @@
     done = {}; save(); render();
   });
 
+  // ---- reward image (parent-chosen favourite character, stored on THIS ipad only) ----
+  var REWARD_KEY = "natsuyasumi-reward";
+  var rewardImg = document.getElementById("rewardImg");
+  var rewardHint = document.getElementById("rewardHint");
+  var dollStage = document.querySelector(".dollstage");
+  function applyReward(){
+    var data = null;
+    try{ data = localStorage.getItem(REWARD_KEY); }catch(e){}
+    if(data){
+      rewardImg.src = data; rewardImg.hidden = false;
+      rewardHint.hidden = true;
+      if(dollStage) dollStage.style.display = "none";
+    }else{
+      rewardImg.hidden = true; rewardImg.removeAttribute("src");
+      rewardHint.hidden = false;
+      if(dollStage) dollStage.style.display = "";
+    }
+  }
+  document.getElementById("rewardBtn").addEventListener("click", function(){
+    document.getElementById("rewardInput").click();
+  });
+  document.getElementById("rewardInput").addEventListener("change", function(ev){
+    var file = ev.target.files && ev.target.files[0];
+    if(!file){ return; }
+    var reader = new FileReader();
+    reader.onload = function(){
+      var img = new Image();
+      img.onload = function(){
+        var max = 560, w = img.width, h = img.height;
+        if(w>h && w>max){ h = Math.round(h*max/w); w = max; }
+        else if(h>=w && h>max){ w = Math.round(w*max/h); h = max; }
+        var cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+        cv.getContext("2d").drawImage(img,0,0,w,h);
+        var out;
+        try{ out = cv.toDataURL("image/jpeg",0.85); }catch(e){ out = reader.result; }
+        try{
+          localStorage.setItem(REWARD_KEY, out);
+          applyReward();
+          celebrate(true); // preview so the child/parent sees it worked
+        }catch(e){
+          alert("がぞうが おおきすぎるみたい。もっと ちいさい しゃしんで ためしてね。");
+        }
+      };
+      img.onerror = function(){ alert("この がぞうは つかえないみたい。べつの しゃしんで ためしてね。"); };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+    ev.target.value = "";
+  });
+
   // ---- celebration ----
+  var DEFAULT_MSG = "すごい！ にんぎょうさんたちも よろこんでるよ 🎉";
+  var PREVIEW_MSG = "この えが ごほうびだよ！ ぜんぶ できたら でてくるよ ✨";
   var celeb = document.getElementById("celebrate");
-  function celebrate(){
+  var celebMsg = document.getElementById("celebMsg");
+  var celebTitle = celeb.querySelector("h2");
+  function celebrate(preview){
+    celebTitle.textContent = preview ? "ごほうび セットしたよ！" : "ぜんぶ できたね！";
+    celebMsg.textContent = preview ? PREVIEW_MSG : DEFAULT_MSG;
     celeb.classList.add("show");
-    if(!reduce) dropConfetti();
+    if(!preview && !reduce) dropConfetti();
   }
   document.getElementById("celebClose").addEventListener("click", function(){
     celeb.classList.remove("show");
     var c = celeb.querySelectorAll(".confetti"); c.forEach(function(x){x.remove();});
   });
+  applyReward();
   function dropConfetti(){
     for(var i=0;i<24;i++){
       (function(i){
