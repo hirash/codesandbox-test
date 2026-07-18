@@ -122,7 +122,7 @@
     100%{opacity:0; transform:translateY(-220%) scale(1) rotate(20deg);}
   }
 
-  .resetrow{flex:0 0 auto; padding-top:6px;}
+  .resetrow{flex:0 0 auto; padding-top:6px; display:flex; flex-wrap:wrap; gap:8px;}
   .reset{
     font-family:inherit; font-weight:800; font-size:clamp(13px,1.4vw,16px); color:var(--ink-soft);
     background:#fff; border:2px solid var(--line); border-radius:999px;
@@ -130,6 +130,44 @@
   }
   .reset:active{transform:scale(.95);}
   .reset:focus-visible{outline:3px solid var(--sky); outline-offset:2px;}
+  #editBtn.active{background:var(--mint); border-color:var(--mint); color:#fff;}
+  #restoreBtn{display:none;}
+  #board.editing #restoreBtn{display:inline-block;}
+
+  /* ---------- edit mode ---------- */
+  .task-row{position:relative;}
+  .edit-tools{
+    position:absolute; right:14px; top:50%; transform:translateY(-50%);
+    display:none; gap:6px; z-index:4;
+  }
+  #board.editing .edit-tools{display:flex;}
+  #board.editing .task{pointer-events:none; border-style:dashed; border-color:#E6CDB8; background:#FFFDFB;}
+  #board.editing .task .check{opacity:0;}
+  #board.editing .task.done{background:#FFFDFB;}
+  #board.editing .task.done .tx{color:var(--ink);}
+  .edit-tools button{
+    width:clamp(36px,3.8vw,46px); height:clamp(36px,3.8vw,46px); border-radius:50%;
+    border:2px solid var(--line); background:#fff; font-size:clamp(15px,1.8vw,20px);
+    cursor:pointer; box-shadow:var(--shadow); display:grid; place-items:center; padding:0;
+    line-height:1; transition:transform .1s;
+  }
+  .edit-tools button:active{transform:scale(.88);}
+  .edit-tools button:focus-visible{outline:3px solid var(--sky); outline-offset:2px;}
+  .edit-tools button.del{background:#FFE9EC; border-color:#FFC2CE;}
+  .add-task{
+    display:none; width:100%; box-sizing:border-box;
+    border:3px dashed #E6CDB8; background:#FFFDFB; color:var(--ink-soft);
+    border-radius:var(--r); padding:clamp(10px,1.2vw,15px); font-family:inherit; font-weight:800;
+    font-size:clamp(15px,1.8vw,20px); cursor:pointer; margin:2px 0 clamp(9px,1.1vw,13px);
+    transition:transform .12s;
+  }
+  .add-task:active{transform:scale(.98);}
+  .add-task:focus-visible{outline:3px solid var(--sky); outline-offset:2px;}
+  #board.editing .add-task{display:block;}
+  .group.empty{display:none;}
+  #board.editing .group.empty{display:block;}
+  #board.editing .hint-edit{display:block;}
+  .hint-edit{display:none; font-size:clamp(12px,1.4vw,15px); color:var(--ink-soft); font-weight:700; margin:0 2px 8px;}
 
   /* ---------- clock panel ---------- */
   .clockpanel{padding:clamp(14px,2vw,28px); align-items:center; justify-content:center; gap:clamp(10px,1.6vw,20px);}
@@ -278,11 +316,14 @@
       </div>
     </div>
 
+    <p class="hint-edit">⬆⬇ ならびかえ ・ ✏️ なまえと えもじ ・ 🗑 けす ・ ＋ ついか</p>
     <div class="lists" id="lists"></div>
 
     <div class="resetrow">
+      <button class="reset" id="editBtn" type="button">✏️ よていを へんしゅう</button>
       <button class="reset" id="resetBtn" type="button">🔄 ぜんぶ りせっと</button>
       <button class="reset" id="rewardBtn" type="button">🖼 ごほうびの え を えらぶ</button>
+      <button class="reset" id="restoreBtn" type="button">↩️ もとの りすとに もどす</button>
       <input type="file" id="rewardInput" accept="image/*" hidden />
     </div>
   </section>
@@ -397,8 +438,8 @@
   "use strict";
   var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion:reduce)").matches;
 
-  // ---- task data (morning -> night) ----
-  var TASKS = [
+  // ---- task data (default; the parent can edit it and it is saved locally) ----
+  var DEFAULT_TASKS = [
     {id:"okiru", ic:"🌅", tx:"おきる",       sub:"あさ 7:00", grp:"asa"},
     {id:"kigae", ic:"👕", tx:"きがえ",       sub:"ぱじゃま ぬぐよ", grp:"asa"},
     {id:"asagohan", ic:"🍚", tx:"あさごはん", sub:"しっかり たべよう", grp:"asa"},
@@ -417,6 +458,28 @@
   ];
   var DOLL_IDS = ["doll-bunny","doll-bear","doll-cat","doll-star","doll-heart"];
 
+  var TASKS_KEY = "natsuyasumi-tasks-v1";
+  function cloneDefaults(){
+    return DEFAULT_TASKS.map(function(t){ return {id:t.id, ic:t.ic, tx:t.tx, sub:t.sub, grp:t.grp}; });
+  }
+  function loadTasks(){
+    try{
+      var raw = localStorage.getItem(TASKS_KEY);
+      if(raw){
+        var a = JSON.parse(raw);
+        if(a && a.length){
+          return a.filter(function(t){ return t && t.tx; }).map(function(t){
+            return {id:t.id||("t"+Math.random().toString(36).slice(2)), ic:t.ic||"⭐",
+                    tx:t.tx, sub:t.sub||"", grp:(t.grp==="hiru"||t.grp==="yoru")?t.grp:"asa"};
+          });
+        }
+      }
+    }catch(e){}
+    return cloneDefaults();
+  }
+  function saveTasks(){ try{ localStorage.setItem(TASKS_KEY, JSON.stringify(TASKS)); }catch(e){} }
+  var TASKS = loadTasks();
+
   // ---- storage keyed by date (auto reset each day) ----
   var now0 = new Date();
   var dayKey = "natsuyasumi-" + now0.getFullYear() + "-" + (now0.getMonth()+1) + "-" + now0.getDate();
@@ -428,40 +491,71 @@
   document.getElementById("datechip").textContent =
     (now0.getMonth()+1) + "がつ" + now0.getDate() + "にち（" +
     ["にち","げつ","か","すい","もく","きん","ど"][now0.getDay()] + "）";
-  document.getElementById("mTotal").textContent = TASKS.length;
-
-  // ---- build meter dolls ----
+  // ---- build / rebuild the meter dolls and the task list ----
   var dollsRow = document.getElementById("dollsRow");
-  for(var i=0;i<TASKS.length;i++){
-    var slot = document.createElement("div");
-    slot.className = "slot off";
-    slot.innerHTML = '<svg viewBox="0 0 100 100"><use href="#'+DOLL_IDS[i%DOLL_IDS.length]+'"/></svg>';
-    dollsRow.appendChild(slot);
-  }
-
-  // ---- build task lists ----
   var listsEl = document.getElementById("lists");
   var taskEls = {};
-  GROUPS.forEach(function(g){
-    var items = TASKS.filter(function(t){return t.grp===g.key;});
-    if(!items.length) return;
-    var wrap = document.createElement("div");
-    wrap.className = "group " + g.cls;
-    wrap.innerHTML = '<div class="group-head"><span class="dot"></span><h2>'+g.name+'</h2></div>';
-    items.forEach(function(t){
-      var b = document.createElement("button");
-      b.type = "button"; b.className = "task"; b.setAttribute("aria-pressed","false");
-      b.innerHTML =
-        '<span class="ic">'+t.ic+'</span>'+
-        '<span class="tx">'+t.tx+'<small>'+t.sub+'</small></span>'+
-        '<span class="check"><svg viewBox="0 0 24 24" stroke="#fff"><use href="#ic-check"/></svg></span>'+
-        '<svg class="stamp" viewBox="0 0 100 100"><use href="#doll-heart"/></svg>';
-      b.addEventListener("click", function(ev){ toggle(t.id, b, ev); });
-      wrap.appendChild(b);
-      taskEls[t.id] = b;
+  function esc(s){
+    return String(s).replace(/[&<>"]/g, function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c];
     });
-    listsEl.appendChild(wrap);
-  });
+  }
+  function rebuildBoard(){
+    // meter dolls
+    dollsRow.innerHTML = "";
+    for(var i=0;i<TASKS.length;i++){
+      var slot = document.createElement("div");
+      slot.className = "slot off";
+      slot.innerHTML = '<svg viewBox="0 0 100 100"><use href="#'+DOLL_IDS[i%DOLL_IDS.length]+'"/></svg>';
+      dollsRow.appendChild(slot);
+    }
+    document.getElementById("mTotal").textContent = TASKS.length;
+    // task list, grouped
+    listsEl.innerHTML = "";
+    taskEls = {};
+    GROUPS.forEach(function(g){
+      var items = TASKS.filter(function(t){ return t.grp===g.key; });
+      var wrap = document.createElement("div");
+      wrap.className = "group " + g.cls + (items.length ? "" : " empty");
+      wrap.innerHTML = '<div class="group-head"><span class="dot"></span><h2>'+g.name+'</h2></div>';
+      items.forEach(function(t){
+        var row = document.createElement("div");
+        row.className = "task-row";
+        var b = document.createElement("button");
+        b.type = "button"; b.className = "task"; b.setAttribute("aria-pressed","false");
+        b.innerHTML =
+          '<span class="ic">'+esc(t.ic)+'</span>'+
+          '<span class="tx">'+esc(t.tx)+(t.sub?'<small>'+esc(t.sub)+'</small>':'')+'</span>'+
+          '<span class="check"><svg viewBox="0 0 24 24" stroke="#fff"><use href="#ic-check"/></svg></span>'+
+          '<svg class="stamp" viewBox="0 0 100 100"><use href="#doll-heart"/></svg>';
+        b.addEventListener("click", (function(id, btn){ return function(ev){ toggle(id, btn, ev); }; })(t.id, b));
+        var tools = document.createElement("div");
+        tools.className = "edit-tools";
+        tools.innerHTML =
+          '<button type="button" data-act="up" aria-label="うえへ">⬆</button>'+
+          '<button type="button" data-act="down" aria-label="したへ">⬇</button>'+
+          '<button type="button" data-act="rename" aria-label="なまえを かえる">✏️</button>'+
+          '<button type="button" class="del" data-act="del" aria-label="けす">🗑</button>';
+        tools.addEventListener("click", (function(id){ return function(ev){
+          var btn = ev.target.closest("button"); if(!btn) return;
+          var act = btn.getAttribute("data-act");
+          if(act==="up") moveTask(id,-1);
+          else if(act==="down") moveTask(id,1);
+          else if(act==="rename") renameTask(id);
+          else if(act==="del") deleteTask(id);
+        }; })(t.id));
+        row.appendChild(b); row.appendChild(tools);
+        wrap.appendChild(row);
+        taskEls[t.id] = b;
+      });
+      var add = document.createElement("button");
+      add.type = "button"; add.className = "add-task";
+      add.textContent = "＋ "+g.name+"に ついか";
+      add.addEventListener("click", (function(key){ return function(){ addTask(key); }; })(g.key));
+      wrap.appendChild(add);
+      listsEl.appendChild(wrap);
+    });
+  }
 
   function render(){
     var count = 0;
@@ -480,6 +574,7 @@
   }
 
   function toggle(id, b, ev){
+    if(editing) return;
     var was = !!done[id];
     done[id] = !was;
     save();
@@ -505,6 +600,60 @@
   // ---- reset ----
   document.getElementById("resetBtn").addEventListener("click", function(){
     done = {}; save(); render();
+  });
+
+  // ---- edit the list (add / rename / reorder / delete), saved locally ----
+  var editing = false;
+  var board = document.getElementById("board");
+  var editBtn = document.getElementById("editBtn");
+  function setEditing(on){
+    editing = on;
+    board.classList.toggle("editing", on);
+    editBtn.classList.toggle("active", on);
+    editBtn.textContent = on ? "✅ へんしゅう おわり" : "✏️ よていを へんしゅう";
+  }
+  editBtn.addEventListener("click", function(){ setEditing(!editing); });
+
+  function moveTask(id, dir){
+    var idx = -1, i;
+    for(i=0;i<TASKS.length;i++){ if(TASKS[i].id===id){ idx=i; break; } }
+    if(idx<0) return;
+    var grp = TASKS[idx].grp, j = idx + dir;
+    while(j>=0 && j<TASKS.length && TASKS[j].grp!==grp){ j += dir; }
+    if(j<0 || j>=TASKS.length || TASKS[j].grp!==grp) return;
+    var tmp = TASKS[idx]; TASKS[idx] = TASKS[j]; TASKS[j] = tmp;
+    saveTasks(); rebuildBoard(); render();
+  }
+  function findTask(id){ for(var i=0;i<TASKS.length;i++){ if(TASKS[i].id===id) return TASKS[i]; } return null; }
+  function renameTask(id){
+    var t = findTask(id); if(!t) return;
+    var name = prompt("なまえを かえてね", t.tx);
+    if(name===null) return;
+    name = name.trim(); if(name) t.tx = name;
+    var ic = prompt("えもじを 1つ（そのままでも OK）", t.ic);
+    if(ic!==null){ ic = ic.trim(); if(ic) t.ic = ic; }
+    saveTasks(); rebuildBoard(); render();
+  }
+  function deleteTask(id){
+    var t = findTask(id); if(!t) return;
+    if(!confirm("「"+t.tx+"」を けしても いい？")) return;
+    TASKS = TASKS.filter(function(x){ return x.id!==id; });
+    delete done[id]; save(); saveTasks(); rebuildBoard(); render();
+  }
+  function addTask(grp){
+    var name = prompt("あたらしい よていの なまえ（れい: すいえい）");
+    if(name===null) return;
+    name = name.trim(); if(!name) return;
+    var ic = prompt("えもじを 1つ（そのままでも OK）", "⭐");
+    ic = (ic===null ? "" : ic.trim()) || "⭐";
+    var id = "t" + Date.now().toString(36) + Math.floor(Math.random()*1000);
+    TASKS.push({ id:id, ic:ic, tx:name, sub:"", grp:grp });
+    saveTasks(); rebuildBoard(); render();
+  }
+  document.getElementById("restoreBtn").addEventListener("click", function(){
+    if(!confirm("よていを さいしょの りすとに もどす？")) return;
+    TASKS = cloneDefaults();
+    saveTasks(); rebuildBoard(); render();
   });
 
   // ---- reward image (parent-chosen favourite character, stored on THIS ipad only) ----
@@ -738,6 +887,7 @@
   tick();
   setInterval(tick, 1000);
 
+  rebuildBoard();
   render();
 })();
 </script>
