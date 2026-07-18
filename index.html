@@ -169,6 +169,48 @@
   #board.editing .hint-edit{display:block;}
   .hint-edit{display:none; font-size:clamp(12px,1.4vw,15px); color:var(--ink-soft); font-weight:700; margin:0 2px 8px;}
 
+  /* ---------- task editor (name + emoji palette) ---------- */
+  #taskEditor{
+    position:absolute; inset:0; z-index:40; display:none; place-items:center;
+    background:rgba(91,69,80,.38); backdrop-filter:blur(3px); padding:16px;
+  }
+  #taskEditor.show{display:grid; animation:fadein .28s ease;}
+  .editor-card{
+    background:#fff; border-radius:30px; padding:clamp(18px,3vw,30px);
+    width:min(94vw,540px); max-height:90vh; overflow-y:auto;
+    box-shadow:var(--shadow-lg); animation:cardpop .4s cubic-bezier(.2,1.4,.5,1);
+  }
+  .editor-card h3{margin:0 0 .7em; font-size:clamp(20px,2.6vw,28px); text-align:center; color:var(--ink); text-wrap:balance;}
+  .editor-name{
+    width:100%; box-sizing:border-box; font-family:inherit; font-weight:800;
+    font-size:clamp(18px,2.2vw,24px); color:var(--ink);
+    border:3px solid var(--line); border-radius:16px; padding:.55em .7em; background:#FFFDFB;
+  }
+  .editor-name::placeholder{color:#C9B6AE; font-weight:700;}
+  .editor-name:focus{outline:none; border-color:var(--pink); box-shadow:0 0 0 4px #FFE3EC;}
+  .editor-name.shake{animation:shake .4s;}
+  @keyframes shake{0%,100%{transform:translateX(0);}20%,60%{transform:translateX(-7px);}40%,80%{transform:translateX(7px);}}
+  .editor-label{font-weight:800; color:var(--ink-soft); font-size:clamp(13px,1.5vw,16px); margin:1.1em 0 .55em;}
+  .emoji-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(clamp(46px,6vw,60px),1fr)); gap:8px;}
+  .emoji-cell{
+    font-size:clamp(24px,3vw,32px); aspect-ratio:1/1; border:2px solid var(--line);
+    background:#FFFDFB; border-radius:14px; cursor:pointer; display:grid; place-items:center;
+    padding:0; line-height:1; transition:transform .1s, border-color .15s, background .15s;
+  }
+  .emoji-cell:active{transform:scale(.88);}
+  .emoji-cell.sel{border-color:var(--pink); background:#FFEAF1; transform:scale(1.06); box-shadow:var(--shadow);}
+  .emoji-cell:focus-visible{outline:3px solid var(--sky); outline-offset:2px;}
+  .editor-actions{display:flex; gap:12px; justify-content:flex-end; margin-top:1.5em;}
+  .ed-btn{
+    font-family:inherit; font-weight:800; font-size:clamp(15px,1.9vw,20px);
+    border-radius:999px; padding:.55em 1.6em; cursor:pointer; border:2px solid var(--line);
+    transition:transform .12s;
+  }
+  .ed-btn:active{transform:scale(.94);}
+  .ed-btn:focus-visible{outline:3px solid var(--sky); outline-offset:2px;}
+  .ed-btn.ghost{background:#fff; color:var(--ink-soft);}
+  .ed-btn.primary{background:var(--coral); color:#fff; border-color:var(--coral);}
+
   /* ---------- clock panel ---------- */
   .clockpanel{padding:clamp(14px,2vw,28px); align-items:center; justify-content:center; gap:clamp(10px,1.6vw,20px);}
   .sky{
@@ -362,6 +404,21 @@
       <p id="celebMsg">すごい！ にんぎょうさんたちも よろこんでるよ 🎉</p>
       <p id="rewardHint" class="reward-hint">したの「🖼 ごほうびの え を えらぶ」で すきな キャラクターを いれると ここに でてくるよ</p>
       <button type="button" id="celebClose">やったー！</button>
+    </div>
+  </div>
+
+  <!-- ================= TASK EDITOR (name + emoji palette) ================= -->
+  <div id="taskEditor" role="dialog" aria-label="よていの へんしゅう">
+    <div class="editor-card">
+      <h3 id="editorTitle">あたらしい よてい</h3>
+      <input id="editorName" class="editor-name" type="text" maxlength="20"
+             placeholder="なまえ（れい: すいえい）" autocomplete="off" />
+      <div class="editor-label">えもじを えらぶ</div>
+      <div class="emoji-grid" id="emojiGrid"></div>
+      <div class="editor-actions">
+        <button type="button" class="ed-btn ghost" id="editorCancel">やめる</button>
+        <button type="button" class="ed-btn primary" id="editorOk">きめた！</button>
+      </div>
     </div>
   </div>
 </div>
@@ -625,14 +682,64 @@
     saveTasks(); rebuildBoard(); render();
   }
   function findTask(id){ for(var i=0;i<TASKS.length;i++){ if(TASKS[i].id===id) return TASKS[i]; } return null; }
+
+  // ---- editor dialog with an emoji palette ----
+  var EMOJIS = ["🌅","☀️","🌙","⭐","🌈","👕","🧦","🪥","🚽","🛁",
+                "🍚","🍙","🍞","🥛","🍎","🍓","🥦","🍅","🥕","🍌",
+                "✏️","📖","📚","📝","🎨","✂️","🧩","🔤","🔢","🇯🇵",
+                "🎹","🎵","🏊","⚽","🏀","🚲","🏃","🤸","🧘","🕺",
+                "🧸","🪀","🎮","🧩","🐶","🐱","🐰","🐟","🌷","🌻",
+                "🧹","🧺","🗑️","🛏️","💤","🦷","👟","🎒","💧","💊",
+                "🕐","🎀","💖","😊","👍","🌸","🍀","🎉"];
+  var editorEl = document.getElementById("taskEditor");
+  var editorName = document.getElementById("editorName");
+  var emojiGrid = document.getElementById("emojiGrid");
+  var editorTitle = document.getElementById("editorTitle");
+  var editorState = { emoji:"⭐", cb:null };
+  EMOJIS.forEach(function(em){
+    var b = document.createElement("button");
+    b.type = "button"; b.className = "emoji-cell"; b.textContent = em;
+    b.setAttribute("aria-label", "えもじ " + em);
+    b.addEventListener("click", function(){ selectEmoji(em); });
+    emojiGrid.appendChild(b);
+  });
+  function selectEmoji(em){
+    editorState.emoji = em;
+    [].forEach.call(emojiGrid.children, function(c){ c.classList.toggle("sel", c.textContent===em); });
+  }
+  function openEditor(opts){
+    editorTitle.textContent = opts.title;
+    editorName.value = opts.name || "";
+    editorState.emoji = opts.emoji || "⭐";
+    selectEmoji(editorState.emoji);
+    editorName.classList.remove("shake");
+    editorState.cb = opts.onOk;
+    editorEl.classList.add("show");
+    setTimeout(function(){ editorName.focus(); }, 60);
+  }
+  function closeEditor(){ editorEl.classList.remove("show"); editorState.cb = null; }
+  function submitEditor(){
+    var name = editorName.value.trim();
+    if(!name){
+      editorName.classList.remove("shake"); void editorName.offsetWidth;
+      editorName.classList.add("shake"); editorName.focus(); return;
+    }
+    var cb = editorState.cb, em = editorState.emoji;
+    closeEditor();
+    if(cb) cb(name, em);
+  }
+  document.getElementById("editorOk").addEventListener("click", submitEditor);
+  document.getElementById("editorCancel").addEventListener("click", closeEditor);
+  editorName.addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); submitEditor(); } });
+  editorEl.addEventListener("click", function(e){ if(e.target===editorEl) closeEditor(); });
+  document.addEventListener("keydown", function(e){ if(e.key==="Escape" && editorEl.classList.contains("show")) closeEditor(); });
+
   function renameTask(id){
     var t = findTask(id); if(!t) return;
-    var name = prompt("なまえを かえてね", t.tx);
-    if(name===null) return;
-    name = name.trim(); if(name) t.tx = name;
-    var ic = prompt("えもじを 1つ（そのままでも OK）", t.ic);
-    if(ic!==null){ ic = ic.trim(); if(ic) t.ic = ic; }
-    saveTasks(); rebuildBoard(); render();
+    openEditor({ title:"よていを かえる", name:t.tx, emoji:t.ic, onOk:function(name, em){
+      t.tx = name; t.ic = em;
+      saveTasks(); rebuildBoard(); render();
+    }});
   }
   function deleteTask(id){
     var t = findTask(id); if(!t) return;
@@ -641,14 +748,12 @@
     delete done[id]; save(); saveTasks(); rebuildBoard(); render();
   }
   function addTask(grp){
-    var name = prompt("あたらしい よていの なまえ（れい: すいえい）");
-    if(name===null) return;
-    name = name.trim(); if(!name) return;
-    var ic = prompt("えもじを 1つ（そのままでも OK）", "⭐");
-    ic = (ic===null ? "" : ic.trim()) || "⭐";
-    var id = "t" + Date.now().toString(36) + Math.floor(Math.random()*1000);
-    TASKS.push({ id:id, ic:ic, tx:name, sub:"", grp:grp });
-    saveTasks(); rebuildBoard(); render();
+    var g = GROUPS.filter(function(x){ return x.key===grp; })[0];
+    openEditor({ title:"あたらしい よてい（"+(g?g.name:"")+"）", name:"", emoji:"⭐", onOk:function(name, em){
+      var id = "t" + Date.now().toString(36) + Math.floor(Math.random()*1000);
+      TASKS.push({ id:id, ic:em, tx:name, sub:"", grp:grp });
+      saveTasks(); rebuildBoard(); render();
+    }});
   }
   document.getElementById("restoreBtn").addEventListener("click", function(){
     if(!confirm("よていを さいしょの りすとに もどす？")) return;
