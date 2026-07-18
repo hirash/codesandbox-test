@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="theme-color" content="#FFF6EA" />
 <meta name="format-detection" content="telephone=no" />
-<title>なつやすみ よていボード</title>
+<title>なつやすみ よていぼーど</title>
 </head>
 <body>
 <style>
@@ -150,7 +150,7 @@
     border-radius:50%; box-shadow:var(--shadow-lg), inset 0 0 0 10px #fff, inset 0 0 0 16px #FFE0B8;
   }
   .clockface svg{position:absolute; inset:0; width:100%; height:100%;}
-  .num{font-weight:800; fill:var(--ink); }
+  .num{font-weight:700; fill:var(--ink); font-family:"Georgia","Times New Roman",serif; letter-spacing:.02em;}
   .num.card{fill:var(--coral);} /* 12 3 6 9 emphasised */
   .hand{stroke-linecap:round; transform-origin:50% 50%;}
   .h-hour{stroke:var(--ink); stroke-width:2.6;}
@@ -234,7 +234,7 @@
         <h1 class="title">なつやすみ <span class="em">よてい</span></h1>
         <span class="datechip" id="datechip">7がつ18にち</span>
       </div>
-      <p class="subtitle">タップして できたら チェック！ ぜんぶできたら おいわいだよ 🎀</p>
+      <p class="subtitle">たっぷして できたら ちぇっく！ ぜんぶできたら おいわいだよ 🎀</p>
 
       <div class="meter">
         <div class="meter-top">
@@ -248,7 +248,7 @@
     <div class="lists" id="lists"></div>
 
     <div class="resetrow">
-      <button class="reset" id="resetBtn" type="button">🔄 ぜんぶ リセット</button>
+      <button class="reset" id="resetBtn" type="button">🔄 ぜんぶ りせっと</button>
     </div>
   </section>
 
@@ -360,10 +360,10 @@
   // ---- task data (morning -> night) ----
   var TASKS = [
     {id:"okiru", ic:"🌅", tx:"おきる",       sub:"あさ 7:00", grp:"asa"},
-    {id:"kigae", ic:"👕", tx:"きがえ",       sub:"パジャマ ぬぐよ", grp:"asa"},
+    {id:"kigae", ic:"👕", tx:"きがえ",       sub:"ぱじゃま ぬぐよ", grp:"asa"},
     {id:"asagohan", ic:"🍚", tx:"あさごはん", sub:"しっかり たべよう", grp:"asa"},
-    {id:"hamigaki", ic:"🪥", tx:"はみがき",   sub:"シャカシャカ", grp:"asa"},
-    {id:"drill", ic:"✏️", tx:"ドリル",       sub:"1ページ がんばる", grp:"asa"},
+    {id:"hamigaki", ic:"🪥", tx:"はみがき",   sub:"しゃかしゃか", grp:"asa"},
+    {id:"drill", ic:"✏️", tx:"どりる",       sub:"いちぺーじ がんばる", grp:"asa"},
     {id:"kataduke", ic:"🧸", tx:"おかたづけ", sub:"おもちゃ もどそう", grp:"hiru"},
     {id:"hirugohan", ic:"🍙", tx:"おひるごはん", sub:"もぐもぐ", grp:"hiru"},
     {id:"asobi", ic:"☀️", tx:"おそとあそび", sub:"げんきに あそぼう", grp:"hiru"},
@@ -517,7 +517,7 @@
   })();
 
   // ================= CLOCK =================
-  var KANJI = ["","一","二","三","四","五","六","七","八","九","十","十一","十二"];
+  var ROMAN = ["","I","II","III","IV","V","VI","VII","VIII","IX","X","XI","XII"];
   var svg = document.getElementById("clockSvg");
   var SVGNS = "http://www.w3.org/2000/svg";
   function el(name, attrs){
@@ -540,13 +540,15 @@
   for(var h=1;h<=12;h++){
     var a = h*30 * Math.PI/180;
     var rt = 70;
+    var glyph = ROMAN[h];
+    var fs = glyph.length>=4 ? 13 : (glyph.length>=3 ? 15 : 18);
     var t = el("text",{
       x:100+rt*Math.sin(a), y:100-rt*Math.cos(a),
       "text-anchor":"middle","dominant-baseline":"central",
-      "font-size":(h===11||h===12)?11:15,
+      "font-size":fs,
       class:"num" + (h%3===0?" card":"")
     });
-    t.textContent = KANJI[h];
+    t.textContent = glyph;
     svg.appendChild(t);
   }
   // hands
@@ -571,13 +573,13 @@
     if(hr<7)  return "ねんね 💤";
     if(hr<8)  return "あさごはん 🍚";
     if(hr<9)  return "はみがき 🪥";
-    if(hr<11) return "ドリル ✏️";
+    if(hr<11) return "どりる ✏️";
     if(hr<13) return "おひるごはん 🍙";
     if(hr<16) return "おそとあそび ☀️";
     if(hr<18) return "おかたづけ 🧸";
     if(hr<20) return "おふろ 🛁";
     if(hr<21) return "ねるじゅんび 🌙";
-    return "おやすみzzz 💤";
+    return "おやすみ 💤";
   }
   var lastCls = "";
   function tick(){
