@@ -34,6 +34,16 @@
     -webkit-tap-highlight-color:transparent;
   }
   .bg-dolls{position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index:0;}
+  .fs-btn{
+    position:absolute; top:12px; right:14px; z-index:12;
+    width:clamp(40px,4vw,50px); height:clamp(40px,4vw,50px); border-radius:50%;
+    border:2px solid rgba(255,255,255,.75); background:rgba(255,255,255,.72);
+    box-shadow:var(--shadow); font-size:clamp(18px,2vw,22px); color:var(--ink-soft);
+    cursor:pointer; display:grid; place-items:center; padding:0; line-height:1;
+    -webkit-backdrop-filter:blur(4px); backdrop-filter:blur(4px); transition:transform .12s;
+  }
+  .fs-btn:active{transform:scale(.9);}
+  .fs-btn:focus-visible{outline:3px solid var(--sky); outline-offset:2px;}
   .bg-dolls .d{position:absolute; opacity:.16;}
   .bg-dolls .d svg{display:block;}
 
@@ -339,6 +349,7 @@
 
 <div id="board">
   <div class="bg-dolls" aria-hidden="true"></div>
+  <button id="fsBtn" class="fs-btn" type="button" aria-label="ぜんがめん" title="ぜんがめん" hidden>⛶</button>
 
   <!-- ================= LEFT : SCHEDULE ================= -->
   <section class="panel schedule" aria-label="なつやすみのよていひょう">
@@ -955,6 +966,26 @@
       })(i);
     }
   }
+
+  // ---- fullscreen button (shown only where the API works; iPad Safari uses Add-to-Home-Screen) ----
+  (function(){
+    var fsBtn = document.getElementById("fsBtn");
+    var root = document.documentElement;
+    var req = root.requestFullscreen || root.webkitRequestFullscreen;
+    var exit = document.exitFullscreen || document.webkitExitFullscreen;
+    if(!req){ return; } // e.g. iPad Safari — keep it hidden
+    fsBtn.hidden = false;
+    function inFs(){ return document.fullscreenElement || document.webkitFullscreenElement; }
+    function sync(){ fsBtn.textContent = inFs() ? "🡼" : "⛶"; }
+    fsBtn.addEventListener("click", function(){
+      try{
+        var p = inFs() ? exit.call(document) : req.call(root);
+        if(p && p.catch){ p.catch(function(){}); }
+      }catch(e){}
+    });
+    document.addEventListener("fullscreenchange", sync);
+    document.addEventListener("webkitfullscreenchange", sync);
+  })();
 
   // ---- scatter background dolls ----
   (function(){
