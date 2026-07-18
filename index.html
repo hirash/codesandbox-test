@@ -1,13 +1,609 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <title>Parcel Sandbox</title>
-    <meta charset="UTF-8" />
-  </head>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="theme-color" content="#FFF6EA" />
+<meta name="format-detection" content="telephone=no" />
+<title>なつやすみ よていボード</title>
+</head>
+<body>
+<style>
+  :root{
+    --cream:#FFF6EA; --panel:#FFFFFF; --ink:#5B4550; --ink-soft:#8C7680;
+    --pink:#FF8FB0; --coral:#FF6F91; --mint:#7FD1AE; --mint-bg:#E7F7EF;
+    --gold:#FFC94D; --sky:#BFE4F5; --lav:#C9A7E8; --line:#F0E2D9;
+    --shadow:0 10px 24px rgba(120,80,90,.14);
+    --shadow-lg:0 18px 40px rgba(120,80,90,.20);
+    --r:26px; --r-sm:18px;
+    --disp:"Hiragino Maru Gothic ProN","ヒラギノ丸ゴ ProN W4","Yu Gothic","YuGothic","Rounded Mplus 1c",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;margin:0;}
+  #board{
+    font-family:var(--disp);
+    color:var(--ink);
+    height:100vh; min-height:100vh;
+    background:
+      radial-gradient(1200px 700px at 15% -10%, #FFEBE0 0%, transparent 55%),
+      radial-gradient(900px 600px at 100% 0%, #EAF6FF 0%, transparent 50%),
+      var(--cream);
+    display:flex; gap:0; overflow:hidden; position:relative;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .bg-dolls{position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index:0;}
+  .bg-dolls .d{position:absolute; opacity:.16;}
+  .bg-dolls .d svg{display:block;}
 
-  <body>
-    <div id="app"></div>
-    <p>修正しました</p>
-    <script src="src/index.js"></script>
-  </body>
+  .panel{position:relative; z-index:1; height:100%; display:flex; flex-direction:column;}
+  .schedule{flex:1 1 56%; min-width:0; padding:clamp(14px,2.2vw,30px); overflow:hidden;}
+  .clockpanel{flex:1 1 44%; min-width:0; border-left:3px dashed #F1DCCB;}
+
+  /* ---------- schedule header ---------- */
+  .s-head{flex:0 0 auto;}
+  .titlerow{display:flex; align-items:baseline; gap:.6em; flex-wrap:wrap;}
+  .title{font-size:clamp(26px,3.4vw,44px); font-weight:800; margin:0; letter-spacing:.02em; text-wrap:balance;}
+  .title .em{color:var(--coral);}
+  .datechip{
+    font-size:clamp(13px,1.4vw,18px); font-weight:700; color:var(--ink-soft);
+    background:#fff; border:2px solid var(--line); border-radius:999px;
+    padding:.28em .9em; box-shadow:var(--shadow);
+  }
+  .subtitle{margin:.15em 0 0; font-size:clamp(13px,1.5vw,17px); color:var(--ink-soft); font-weight:700;}
+
+  /* ---------- progress meter ---------- */
+  .meter{
+    margin:clamp(12px,1.6vw,18px) 0; background:#fff; border-radius:var(--r);
+    padding:clamp(12px,1.6vw,18px) clamp(14px,1.8vw,22px); box-shadow:var(--shadow);
+    border:2px solid #fff;
+  }
+  .meter-top{display:flex; align-items:center; justify-content:space-between; gap:1em;}
+  .meter-label{font-weight:800; font-size:clamp(15px,1.7vw,20px);}
+  .meter-count{font-weight:800; font-size:clamp(15px,1.7vw,20px); color:var(--coral);
+    font-variant-numeric:tabular-nums;}
+  .meter-count b{font-size:1.35em;}
+  .dolls-row{display:flex; gap:.4vw; margin-top:.7em; flex-wrap:nowrap;}
+  .dolls-row .slot{flex:1 1 0; aspect-ratio:1/1; position:relative;}
+  .dolls-row .slot svg{width:100%; height:100%; display:block;
+    transition:transform .35s cubic-bezier(.2,1.4,.5,1), opacity .3s;}
+  .dolls-row .slot.off svg{opacity:.28; filter:grayscale(.7); transform:scale(.82);}
+  .dolls-row .slot.on svg{opacity:1; transform:scale(1);}
+
+  /* ---------- lists ---------- */
+  .lists{flex:1 1 auto; overflow-y:auto; padding:2px 4px 20px; margin-top:2px;
+    -webkit-overflow-scrolling:touch;}
+  .lists::-webkit-scrollbar{width:10px;}
+  .lists::-webkit-scrollbar-thumb{background:#F0D9C8; border-radius:99px;}
+  .group{margin-top:clamp(10px,1.4vw,16px);}
+  .group:first-child{margin-top:0;}
+  .group-head{display:flex; align-items:center; gap:.5em; margin:0 0 .5em; padding-left:.2em;}
+  .group-head .dot{width:.7em; height:.7em; border-radius:50%; flex:0 0 auto;}
+  .group-head h2{margin:0; font-size:clamp(15px,1.7vw,20px); font-weight:800; letter-spacing:.04em;}
+  .g-asa .dot{background:var(--gold);} .g-asa h2{color:#D99A1F;}
+  .g-hiru .dot{background:var(--sky);} .g-hiru h2{color:#3EA0CF;}
+  .g-yoru .dot{background:var(--lav);} .g-yoru h2{color:#9A6FD0;}
+
+  .task{
+    width:100%; text-align:left; display:flex; align-items:center; gap:clamp(12px,1.6vw,20px);
+    background:#fff; border:3px solid #fff; border-radius:var(--r);
+    padding:clamp(11px,1.5vw,18px) clamp(14px,1.8vw,22px);
+    margin:0 0 clamp(9px,1.1vw,13px); box-shadow:var(--shadow);
+    font-family:inherit; color:inherit; cursor:pointer;
+    transition:transform .12s ease, box-shadow .2s, background .3s, border-color .3s;
+    position:relative; overflow:hidden;
+  }
+  .task:active{transform:scale(.975);}
+  .task:focus-visible{outline:4px solid var(--sky); outline-offset:3px;}
+  .task .ic{font-size:clamp(28px,3.6vw,44px); line-height:1; flex:0 0 auto;
+    width:1.5em; text-align:center; filter:drop-shadow(0 2px 2px rgba(0,0,0,.08));}
+  .task .tx{font-size:clamp(18px,2.3vw,28px); font-weight:800; flex:1 1 auto;}
+  .task .tx small{display:block; font-size:.55em; font-weight:700; color:var(--ink-soft); margin-top:.1em;}
+  .task .check{
+    flex:0 0 auto; width:clamp(34px,4vw,50px); height:clamp(34px,4vw,50px);
+    border-radius:50%; border:3px solid #EAD9CC; background:#FCF6F0;
+    display:grid; place-items:center; transition:all .3s cubic-bezier(.2,1.4,.5,1);
+  }
+  .task .check svg{width:60%; height:60%; opacity:0; transform:scale(.3); transition:all .3s cubic-bezier(.2,1.6,.5,1);}
+  /* done state */
+  .task.done{background:var(--mint-bg); border-color:var(--mint);}
+  .task.done .tx{color:#2E9C77;}
+  .task.done .check{background:var(--mint); border-color:var(--mint);}
+  .task.done .check svg{opacity:1; transform:scale(1); stroke:#fff;}
+  .task .stamp{
+    position:absolute; right:14px; top:50%; width:44px; height:44px; opacity:0;
+    transform:translateY(-50%) scale(.2) rotate(-30deg); pointer-events:none;
+  }
+  .task.pop .stamp{animation:stampPop .8s ease forwards;}
+  @keyframes stampPop{
+    0%{opacity:0; transform:translateY(-50%) scale(.2) rotate(-30deg);}
+    35%{opacity:.95; transform:translateY(-120%) scale(1.25) rotate(12deg);}
+    100%{opacity:0; transform:translateY(-220%) scale(1) rotate(20deg);}
+  }
+
+  .resetrow{flex:0 0 auto; padding-top:6px;}
+  .reset{
+    font-family:inherit; font-weight:800; font-size:clamp(13px,1.4vw,16px); color:var(--ink-soft);
+    background:#fff; border:2px solid var(--line); border-radius:999px;
+    padding:.5em 1.2em; cursor:pointer; box-shadow:var(--shadow); transition:transform .12s;
+  }
+  .reset:active{transform:scale(.95);}
+  .reset:focus-visible{outline:3px solid var(--sky); outline-offset:2px;}
+
+  /* ---------- clock panel ---------- */
+  .clockpanel{padding:clamp(14px,2vw,28px); align-items:center; justify-content:center; gap:clamp(10px,1.6vw,20px);}
+  .sky{
+    position:absolute; inset:0; z-index:0; transition:background 1.5s ease;
+    background:linear-gradient(180deg,#BFE4F5 0%,#EAF7FF 60%,#FFF6EA 100%);
+  }
+  .sky.dawn{background:linear-gradient(180deg,#FFD1B8 0%,#FFE3D6 45%,#FFF3E6 100%);}
+  .sky.day{background:linear-gradient(180deg,#AEDBF3 0%,#DBF1FF 55%,#FBFAF3 100%);}
+  .sky.dusk{background:linear-gradient(180deg,#FFB27A 0%,#FFCF9E 45%,#FFE9D3 100%);}
+  .sky.night{background:linear-gradient(180deg,#3B3170 0%,#5A4E92 55%,#8E7FC0 100%);}
+  .sky .celest{position:absolute; transition:all 1.2s ease;}
+  .clock-wrap{position:relative; z-index:1; display:flex; flex-direction:column; align-items:center;
+    gap:clamp(8px,1.4vw,16px); width:100%;}
+  .clockface{
+    width:min(46vw,60vh,520px); aspect-ratio:1/1; position:relative;
+    background:radial-gradient(circle at 50% 42%, #FFFFFF 0%, #FFF8F0 72%, #FCEFE2 100%);
+    border-radius:50%; box-shadow:var(--shadow-lg), inset 0 0 0 10px #fff, inset 0 0 0 16px #FFE0B8;
+  }
+  .clockface svg{position:absolute; inset:0; width:100%; height:100%;}
+  .num{font-weight:800; fill:var(--ink); }
+  .num.card{fill:var(--coral);} /* 12 3 6 9 emphasised */
+  .hand{stroke-linecap:round; transform-origin:50% 50%;}
+  .h-hour{stroke:var(--ink); stroke-width:2.6;}
+  .h-min{stroke:var(--coral); stroke-width:2;}
+  .h-sec{stroke:var(--pink); stroke-width:.8;}
+  .center-doll{position:absolute; left:50%; top:50%; width:20%; height:20%; transform:translate(-50%,-50%); z-index:2;}
+
+  .digital{
+    position:relative; z-index:1; background:rgba(255,255,255,.9); border-radius:var(--r);
+    padding:clamp(8px,1.2vw,14px) clamp(18px,2.4vw,30px); box-shadow:var(--shadow);
+    display:flex; align-items:center; gap:clamp(10px,1.6vw,20px); backdrop-filter:blur(4px);
+  }
+  .digital .time{font-size:clamp(34px,5.4vw,64px); font-weight:800; font-variant-numeric:tabular-nums;
+    letter-spacing:.01em; line-height:1;}
+  .digital .time .colon{color:var(--pink); animation:blink 1s steps(1) infinite;}
+  @keyframes blink{50%{opacity:.25;}}
+  .digital .tod{display:flex; align-items:center; gap:.4em; font-size:clamp(15px,1.9vw,24px); font-weight:800;}
+  .digital .tod svg{width:clamp(30px,4vw,52px); height:clamp(30px,4vw,52px);}
+
+  .now-doing{
+    position:relative; z-index:1; text-align:center; font-weight:800;
+    font-size:clamp(15px,1.9vw,23px); color:var(--ink);
+    background:rgba(255,255,255,.8); border-radius:999px; padding:.45em 1.1em; box-shadow:var(--shadow);
+    max-width:90%;
+  }
+  .now-doing .lbl{color:var(--ink-soft); font-size:.72em; margin-right:.4em;}
+
+  /* ---------- celebration ---------- */
+  #celebrate{position:absolute; inset:0; z-index:20; display:none; place-items:center;
+    background:rgba(91,69,80,.35); backdrop-filter:blur(3px);}
+  #celebrate.show{display:grid; animation:fadein .4s ease;}
+  @keyframes fadein{from{opacity:0;}to{opacity:1;}}
+  .celebrate-card{
+    background:#fff; border-radius:34px; padding:clamp(24px,4vw,50px) clamp(28px,5vw,64px);
+    text-align:center; box-shadow:var(--shadow-lg); max-width:80%;
+    animation:cardpop .5s cubic-bezier(.2,1.4,.5,1);
+  }
+  @keyframes cardpop{from{transform:scale(.6); opacity:0;}to{transform:scale(1); opacity:1;}}
+  .celebrate-card h2{font-size:clamp(30px,5vw,58px); margin:.1em 0; color:var(--coral); text-wrap:balance;}
+  .celebrate-card p{font-size:clamp(16px,2.2vw,26px); font-weight:800; color:var(--ink-soft); margin:.2em 0 1em;}
+  .celebrate-card .dollstage{display:flex; justify-content:center; gap:10px; margin-bottom:.4em;}
+  .celebrate-card .dollstage svg{width:clamp(52px,8vw,90px); height:clamp(52px,8vw,90px);
+    animation:bob 1.4s ease-in-out infinite;}
+  .celebrate-card .dollstage svg:nth-child(2){animation-delay:.2s;}
+  .celebrate-card .dollstage svg:nth-child(3){animation-delay:.4s;}
+  @keyframes bob{50%{transform:translateY(-12px) rotate(-4deg);}}
+  .celebrate-card button{
+    font-family:inherit; font-weight:800; font-size:clamp(16px,2vw,22px); color:#fff;
+    background:var(--coral); border:none; border-radius:999px; padding:.6em 1.8em; cursor:pointer;
+    box-shadow:var(--shadow); transition:transform .12s;
+  }
+  .celebrate-card button:active{transform:scale(.95);}
+  .confetti{position:absolute; top:-30px; pointer-events:none;}
+
+  /* floating heart on tap */
+  .float{position:absolute; z-index:15; pointer-events:none; animation:floatUp 1s ease forwards;}
+  @keyframes floatUp{from{opacity:1; transform:translateY(0) scale(1);}
+    to{opacity:0; transform:translateY(-90px) scale(1.4);}}
+
+  @media (prefers-reduced-motion:reduce){
+    *{animation-duration:.001ms !important; transition-duration:.05ms !important;}
+    .digital .time .colon{animation:none;}
+  }
+  /* portrait / narrow: stack */
+  @media (max-aspect-ratio:1/1), (max-width:760px){
+    #board{flex-direction:column; height:auto; min-height:100vh; overflow:auto;}
+    .schedule{flex:none; order:2; overflow:visible;}
+    .lists{overflow:visible;}
+    .clockpanel{flex:none; order:1; border-left:none; border-bottom:3px dashed #F1DCCB; padding-bottom:20px;}
+    .clockface{width:min(70vw,44vh,420px);}
+  }
+</style>
+
+<div id="board">
+  <div class="bg-dolls" aria-hidden="true"></div>
+
+  <!-- ================= LEFT : SCHEDULE ================= -->
+  <section class="panel schedule" aria-label="なつやすみのよていひょう">
+    <div class="s-head">
+      <div class="titlerow">
+        <h1 class="title">なつやすみ <span class="em">よてい</span></h1>
+        <span class="datechip" id="datechip">7がつ18にち</span>
+      </div>
+      <p class="subtitle">タップして できたら チェック！ ぜんぶできたら おいわいだよ 🎀</p>
+
+      <div class="meter">
+        <div class="meter-top">
+          <span class="meter-label">きょうの たっせい</span>
+          <span class="meter-count"><b id="mDone">0</b> / <span id="mTotal">10</span></span>
+        </div>
+        <div class="dolls-row" id="dollsRow" aria-hidden="true"></div>
+      </div>
+    </div>
+
+    <div class="lists" id="lists"></div>
+
+    <div class="resetrow">
+      <button class="reset" id="resetBtn" type="button">🔄 ぜんぶ リセット</button>
+    </div>
+  </section>
+
+  <!-- ================= RIGHT : CLOCK ================= -->
+  <section class="panel clockpanel" aria-label="とけい">
+    <div class="sky" id="sky"></div>
+    <div class="clock-wrap">
+      <div class="clockface">
+        <svg viewBox="0 0 200 200" id="clockSvg" aria-hidden="true"></svg>
+        <div class="center-doll"><svg viewBox="0 0 100 100"><use href="#doll-bear"/></svg></div>
+      </div>
+
+      <div class="digital">
+        <div class="time"><span id="hh">--</span><span class="colon">:</span><span id="mm">--</span></div>
+        <div class="tod"><svg id="todIcon" viewBox="0 0 100 100"><use href="#doll-star"/></svg><span id="todText">—</span></div>
+      </div>
+
+      <div class="now-doing"><span class="lbl">いまは</span><span id="nowDoing">—</span></div>
+    </div>
+  </section>
+
+  <!-- ================= CELEBRATION ================= -->
+  <div id="celebrate" role="dialog" aria-label="おめでとう">
+    <div class="celebrate-card">
+      <div class="dollstage">
+        <svg viewBox="0 0 100 100"><use href="#doll-bunny"/></svg>
+        <svg viewBox="0 0 100 100"><use href="#doll-bear"/></svg>
+        <svg viewBox="0 0 100 100"><use href="#doll-cat"/></svg>
+      </div>
+      <h2>ぜんぶ できたね！</h2>
+      <p>すごい！ にんぎょうさんたちも よろこんでるよ 🎉</p>
+      <button type="button" id="celebClose">やったー！</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ DOLL SYMBOLS ============ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <!-- BUNNY -->
+    <symbol id="doll-bunny" viewBox="0 0 100 100">
+      <ellipse cx="36" cy="24" rx="9" ry="20" fill="#FFDCE6" stroke="#F5A9C0" stroke-width="2.5"/>
+      <ellipse cx="64" cy="24" rx="9" ry="20" fill="#FFDCE6" stroke="#F5A9C0" stroke-width="2.5"/>
+      <ellipse cx="36" cy="26" rx="4" ry="12" fill="#FFB6CE"/>
+      <ellipse cx="64" cy="26" rx="4" ry="12" fill="#FFB6CE"/>
+      <circle cx="50" cy="62" r="30" fill="#FFF0F5" stroke="#F5A9C0" stroke-width="2.5"/>
+      <circle cx="40" cy="60" r="3.4" fill="#5B4550"/>
+      <circle cx="60" cy="60" r="3.4" fill="#5B4550"/>
+      <circle cx="34" cy="68" r="4.5" fill="#FFC2D5"/>
+      <circle cx="66" cy="68" r="4.5" fill="#FFC2D5"/>
+      <path d="M46 68 q4 4 8 0" fill="none" stroke="#E1698F" stroke-width="2.4" stroke-linecap="round"/>
+      <circle cx="50" cy="65" r="2.6" fill="#FF8FB0"/>
+    </symbol>
+    <!-- BEAR -->
+    <symbol id="doll-bear" viewBox="0 0 100 100">
+      <circle cx="30" cy="30" r="12" fill="#E8C9A0" stroke="#C99B6A" stroke-width="2.5"/>
+      <circle cx="70" cy="30" r="12" fill="#E8C9A0" stroke="#C99B6A" stroke-width="2.5"/>
+      <circle cx="30" cy="30" r="5.5" fill="#F6E1C6"/>
+      <circle cx="70" cy="30" r="5.5" fill="#F6E1C6"/>
+      <circle cx="50" cy="58" r="32" fill="#F2D8B4" stroke="#C99B6A" stroke-width="2.5"/>
+      <ellipse cx="50" cy="66" rx="15" ry="12" fill="#FBEEDD"/>
+      <circle cx="40" cy="54" r="3.6" fill="#5B4550"/>
+      <circle cx="60" cy="54" r="3.6" fill="#5B4550"/>
+      <circle cx="33" cy="62" r="4.5" fill="#FFC2A6"/>
+      <circle cx="67" cy="62" r="4.5" fill="#FFC2A6"/>
+      <ellipse cx="50" cy="62" rx="3.6" ry="2.8" fill="#7A5C43"/>
+      <path d="M50 64 v3 M50 67 q-4 3 -7 1 M50 67 q4 3 7 1" fill="none" stroke="#7A5C43" stroke-width="2" stroke-linecap="round"/>
+    </symbol>
+    <!-- CAT -->
+    <symbol id="doll-cat" viewBox="0 0 100 100">
+      <path d="M28 34 L26 12 L44 26 Z" fill="#D9CFF0" stroke="#B49BE0" stroke-width="2.5" stroke-linejoin="round"/>
+      <path d="M72 34 L74 12 L56 26 Z" fill="#D9CFF0" stroke="#B49BE0" stroke-width="2.5" stroke-linejoin="round"/>
+      <circle cx="50" cy="58" r="32" fill="#EDE7FA" stroke="#B49BE0" stroke-width="2.5"/>
+      <circle cx="40" cy="55" r="3.6" fill="#5B4550"/>
+      <circle cx="60" cy="55" r="3.6" fill="#5B4550"/>
+      <circle cx="32" cy="63" r="4.5" fill="#F4C4DA"/>
+      <circle cx="68" cy="63" r="4.5" fill="#F4C4DA"/>
+      <path d="M50 60 l-3 3 h6 z" fill="#FF8FB0"/>
+      <path d="M50 63 q-4 3 -8 1 M50 63 q4 3 8 1" fill="none" stroke="#9A6FD0" stroke-width="2" stroke-linecap="round"/>
+      <path d="M20 58 h10 M22 64 h9 M70 58 h10 M69 64 h9" stroke="#C9B9EC" stroke-width="1.6" stroke-linecap="round"/>
+    </symbol>
+    <!-- STAR -->
+    <symbol id="doll-star" viewBox="0 0 100 100">
+      <path d="M50 8 L61 38 L94 40 L67 60 L77 92 L50 72 L23 92 L33 60 L6 40 L39 38 Z"
+        fill="#FFE07A" stroke="#F5C33B" stroke-width="3" stroke-linejoin="round"/>
+      <circle cx="42" cy="52" r="3.4" fill="#5B4550"/>
+      <circle cx="58" cy="52" r="3.4" fill="#5B4550"/>
+      <circle cx="36" cy="58" r="4" fill="#FFB6A0"/>
+      <circle cx="64" cy="58" r="4" fill="#FFB6A0"/>
+      <path d="M46 58 q4 4 8 0" fill="none" stroke="#E19A2E" stroke-width="2.4" stroke-linecap="round"/>
+    </symbol>
+    <!-- HEART -->
+    <symbol id="doll-heart" viewBox="0 0 100 100">
+      <path d="M50 84 C18 60 12 36 26 24 C38 14 50 26 50 34 C50 26 62 14 74 24 C88 36 82 60 50 84 Z"
+        fill="#FF9EBC" stroke="#F06e94" stroke-width="3" stroke-linejoin="round"/>
+    </symbol>
+    <!-- CHECK -->
+    <symbol id="ic-check" viewBox="0 0 24 24">
+      <path d="M5 13 l4 4 L19 6" fill="none" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+  </defs>
+</svg>
+
+<script>
+(function(){
+  "use strict";
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion:reduce)").matches;
+
+  // ---- task data (morning -> night) ----
+  var TASKS = [
+    {id:"okiru", ic:"🌅", tx:"おきる",       sub:"あさ 7:00", grp:"asa"},
+    {id:"kigae", ic:"👕", tx:"きがえ",       sub:"パジャマ ぬぐよ", grp:"asa"},
+    {id:"asagohan", ic:"🍚", tx:"あさごはん", sub:"しっかり たべよう", grp:"asa"},
+    {id:"hamigaki", ic:"🪥", tx:"はみがき",   sub:"シャカシャカ", grp:"asa"},
+    {id:"drill", ic:"✏️", tx:"ドリル",       sub:"1ページ がんばる", grp:"asa"},
+    {id:"kataduke", ic:"🧸", tx:"おかたづけ", sub:"おもちゃ もどそう", grp:"hiru"},
+    {id:"hirugohan", ic:"🍙", tx:"おひるごはん", sub:"もぐもぐ", grp:"hiru"},
+    {id:"asobi", ic:"☀️", tx:"おそとあそび", sub:"げんきに あそぼう", grp:"hiru"},
+    {id:"ofuro", ic:"🛁", tx:"おふろ",       sub:"あったまろう", grp:"yoru"},
+    {id:"neru", ic:"🌙", tx:"ねるじゅんび",  sub:"9:00 おやすみ", grp:"yoru"}
+  ];
+  var GROUPS = [
+    {key:"asa",  cls:"g-asa",  name:"あさ"},
+    {key:"hiru", cls:"g-hiru", name:"おひる"},
+    {key:"yoru", cls:"g-yoru", name:"よる"}
+  ];
+  var DOLL_IDS = ["doll-bunny","doll-bear","doll-cat","doll-star","doll-heart"];
+
+  // ---- storage keyed by date (auto reset each day) ----
+  var now0 = new Date();
+  var dayKey = "natsuyasumi-" + now0.getFullYear() + "-" + (now0.getMonth()+1) + "-" + now0.getDate();
+  var done = {};
+  try { done = JSON.parse(localStorage.getItem(dayKey) || "{}") || {}; } catch(e){ done = {}; }
+  function save(){ try{ localStorage.setItem(dayKey, JSON.stringify(done)); }catch(e){} }
+
+  // ---- date chip ----
+  document.getElementById("datechip").textContent =
+    (now0.getMonth()+1) + "がつ" + now0.getDate() + "にち（" +
+    ["にち","げつ","か","すい","もく","きん","ど"][now0.getDay()] + "）";
+  document.getElementById("mTotal").textContent = TASKS.length;
+
+  // ---- build meter dolls ----
+  var dollsRow = document.getElementById("dollsRow");
+  for(var i=0;i<TASKS.length;i++){
+    var slot = document.createElement("div");
+    slot.className = "slot off";
+    slot.innerHTML = '<svg viewBox="0 0 100 100"><use href="#'+DOLL_IDS[i%DOLL_IDS.length]+'"/></svg>';
+    dollsRow.appendChild(slot);
+  }
+
+  // ---- build task lists ----
+  var listsEl = document.getElementById("lists");
+  var taskEls = {};
+  GROUPS.forEach(function(g){
+    var items = TASKS.filter(function(t){return t.grp===g.key;});
+    if(!items.length) return;
+    var wrap = document.createElement("div");
+    wrap.className = "group " + g.cls;
+    wrap.innerHTML = '<div class="group-head"><span class="dot"></span><h2>'+g.name+'</h2></div>';
+    items.forEach(function(t){
+      var b = document.createElement("button");
+      b.type = "button"; b.className = "task"; b.setAttribute("aria-pressed","false");
+      b.innerHTML =
+        '<span class="ic">'+t.ic+'</span>'+
+        '<span class="tx">'+t.tx+'<small>'+t.sub+'</small></span>'+
+        '<span class="check"><svg viewBox="0 0 24 24" stroke="#fff"><use href="#ic-check"/></svg></span>'+
+        '<svg class="stamp" viewBox="0 0 100 100"><use href="#doll-heart"/></svg>';
+      b.addEventListener("click", function(ev){ toggle(t.id, b, ev); });
+      wrap.appendChild(b);
+      taskEls[t.id] = b;
+    });
+    listsEl.appendChild(wrap);
+  });
+
+  function render(){
+    var count = 0;
+    TASKS.forEach(function(t, idx){
+      var b = taskEls[t.id];
+      var on = !!done[t.id];
+      b.classList.toggle("done", on);
+      b.setAttribute("aria-pressed", on ? "true":"false");
+      var slot = dollsRow.children[idx];
+      slot.classList.toggle("on", on);
+      slot.classList.toggle("off", !on);
+      if(on) count++;
+    });
+    document.getElementById("mDone").textContent = count;
+    return count;
+  }
+
+  function toggle(id, b, ev){
+    var was = !!done[id];
+    done[id] = !was;
+    save();
+    if(done[id]){
+      b.classList.remove("pop"); void b.offsetWidth; b.classList.add("pop");
+      floatHeart(ev);
+    }
+    var count = render();
+    if(count === TASKS.length && !was) celebrate();
+  }
+
+  function floatHeart(ev){
+    if(reduce || !ev) return;
+    var f = document.createElement("div");
+    f.className = "float";
+    f.innerHTML = '<svg width="46" height="46" viewBox="0 0 100 100"><use href="#doll-heart"/></svg>';
+    f.style.left = (ev.clientX - 23) + "px";
+    f.style.top  = (ev.clientY - 23) + "px";
+    document.getElementById("board").appendChild(f);
+    setTimeout(function(){ f.remove(); }, 1000);
+  }
+
+  // ---- reset ----
+  document.getElementById("resetBtn").addEventListener("click", function(){
+    done = {}; save(); render();
+  });
+
+  // ---- celebration ----
+  var celeb = document.getElementById("celebrate");
+  function celebrate(){
+    celeb.classList.add("show");
+    if(!reduce) dropConfetti();
+  }
+  document.getElementById("celebClose").addEventListener("click", function(){
+    celeb.classList.remove("show");
+    var c = celeb.querySelectorAll(".confetti"); c.forEach(function(x){x.remove();});
+  });
+  function dropConfetti(){
+    for(var i=0;i<24;i++){
+      (function(i){
+        var el = document.createElement("div");
+        el.className = "confetti";
+        var id = DOLL_IDS[i%DOLL_IDS.length];
+        var sz = 22 + Math.random()*22;
+        el.innerHTML = '<svg width="'+sz+'" height="'+sz+'" viewBox="0 0 100 100"><use href="#'+id+'"/></svg>';
+        el.style.left = Math.random()*100 + "%";
+        var dur = 2.4 + Math.random()*2;
+        el.animate(
+          [{transform:"translateY(-40px) rotate(0deg)", opacity:1},
+           {transform:"translateY(90vh) rotate("+(360+Math.random()*360)+"deg)", opacity:.9}],
+          {duration:dur*1000, easing:"ease-in", delay:Math.random()*600}
+        );
+        celeb.appendChild(el);
+        setTimeout(function(){ el.remove(); }, dur*1000 + 700);
+      })(i);
+    }
+  }
+
+  // ---- scatter background dolls ----
+  (function(){
+    var bg = document.querySelector(".bg-dolls");
+    var spots = [
+      [6,14,70],[88,10,54],[4,74,60],[92,80,66],[70,50,44],
+      [24,88,50],[50,6,40],[82,44,40],[14,46,46],[60,90,52]
+    ];
+    spots.forEach(function(s,i){
+      var d = document.createElement("div");
+      d.className = "d";
+      d.style.left = s[0]+"%"; d.style.top = s[1]+"%";
+      var id = DOLL_IDS[i%DOLL_IDS.length];
+      d.innerHTML = '<svg width="'+s[2]+'" height="'+s[2]+'" viewBox="0 0 100 100"><use href="#'+id+'"/></svg>';
+      d.style.transform = "rotate("+(Math.random()*40-20)+"deg)";
+      bg.appendChild(d);
+    });
+  })();
+
+  // ================= CLOCK =================
+  var KANJI = ["","一","二","三","四","五","六","七","八","九","十","十一","十二"];
+  var svg = document.getElementById("clockSvg");
+  var SVGNS = "http://www.w3.org/2000/svg";
+  function el(name, attrs){
+    var e = document.createElementNS(SVGNS, name);
+    for(var k in attrs){ e.setAttribute(k, attrs[k]); }
+    return e;
+  }
+  // ticks
+  for(var m=0;m<60;m++){
+    var big = (m%5===0);
+    var ang = m*6 * Math.PI/180;
+    var r1 = big?83:86, r2 = 90;
+    svg.appendChild(el("line",{
+      x1:100+r1*Math.sin(ang), y1:100-r1*Math.cos(ang),
+      x2:100+r2*Math.sin(ang), y2:100-r2*Math.cos(ang),
+      stroke: big?"#F5B679":"#F2D9C2", "stroke-width": big?2:1, "stroke-linecap":"round"
+    }));
+  }
+  // kanji numerals
+  for(var h=1;h<=12;h++){
+    var a = h*30 * Math.PI/180;
+    var rt = 70;
+    var t = el("text",{
+      x:100+rt*Math.sin(a), y:100-rt*Math.cos(a),
+      "text-anchor":"middle","dominant-baseline":"central",
+      "font-size":(h===11||h===12)?11:15,
+      class:"num" + (h%3===0?" card":"")
+    });
+    t.textContent = KANJI[h];
+    svg.appendChild(t);
+  }
+  // hands
+  var hHour = el("line",{x1:100,y1:112,x2:100,y2:52,class:"hand h-hour"});
+  var hMin  = el("line",{x1:100,y1:116,x2:100,y2:34,class:"hand h-min"});
+  var hSec  = el("line",{x1:100,y1:120,x2:100,y2:26,class:"hand h-sec"});
+  svg.appendChild(hHour); svg.appendChild(hMin); svg.appendChild(hSec);
+  svg.appendChild(el("circle",{cx:100,cy:100,r:4.5,fill:"#FF6F91"}));
+
+  var sky = document.getElementById("sky");
+  var todText = document.getElementById("todText");
+  var todUse = document.querySelector("#todIcon use");
+  var nowDoing = document.getElementById("nowDoing");
+
+  function todInfo(hr){
+    if(hr>=5 && hr<9)   return {cls:"dawn", name:"あさだよ",   doll:"#doll-star", task:"asagohan"};
+    if(hr>=9 && hr<16)  return {cls:"day",  name:"おひるだよ", doll:"#doll-bunny", task:"asobi"};
+    if(hr>=16 && hr<19) return {cls:"dusk", name:"ゆうがた",   doll:"#doll-cat",  task:"ofuro"};
+    return {cls:"night", name:"よるだよ", doll:"#doll-bear", task:"neru"};
+  }
+  function scheduleNow(hr){
+    if(hr<7)  return "ねんね 💤";
+    if(hr<8)  return "あさごはん 🍚";
+    if(hr<9)  return "はみがき 🪥";
+    if(hr<11) return "ドリル ✏️";
+    if(hr<13) return "おひるごはん 🍙";
+    if(hr<16) return "おそとあそび ☀️";
+    if(hr<18) return "おかたづけ 🧸";
+    if(hr<20) return "おふろ 🛁";
+    if(hr<21) return "ねるじゅんび 🌙";
+    return "おやすみzzz 💤";
+  }
+  var lastCls = "";
+  function tick(){
+    var d = new Date();
+    var s = d.getSeconds(), mi = d.getMinutes(), hr = d.getHours();
+    var secA = s*6, minA = mi*6 + s*0.1, hrA = (hr%12)*30 + mi*0.5;
+    hSec.setAttribute("transform","rotate("+secA+" 100 100)");
+    hMin.setAttribute("transform","rotate("+minA+" 100 100)");
+    hHour.setAttribute("transform","rotate("+hrA+" 100 100)");
+    document.getElementById("hh").textContent = (hr<10?"0":"")+hr;
+    document.getElementById("mm").textContent = (mi<10?"0":"")+mi;
+    var info = todInfo(hr);
+    if(info.cls!==lastCls){
+      sky.className = "sky " + info.cls;
+      lastCls = info.cls;
+      todText.textContent = info.name;
+      todUse.setAttribute("href", info.doll);
+    }
+    nowDoing.textContent = scheduleNow(hr);
+  }
+  tick();
+  setInterval(tick, 1000);
+
+  render();
+})();
+</script>
+
+</body>
 </html>
