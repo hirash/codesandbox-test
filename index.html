@@ -196,13 +196,39 @@
     animation:bob 1.4s ease-in-out infinite;}
   .celebrate-card .dollstage svg:nth-child(2){animation-delay:.2s;}
   .celebrate-card .dollstage svg:nth-child(3){animation-delay:.4s;}
+  .reward-stage{position:relative; display:inline-block; margin:0 auto clamp(12px,1.8vw,20px); z-index:0;}
+  .reward-rays{
+    position:absolute; left:50%; top:50%; width:190%; height:190%; z-index:-1;
+    transform:translate(-50%,-50%); border-radius:50%; pointer-events:none;
+    background:repeating-conic-gradient(from 0deg,
+      rgba(255,201,77,.55) 0deg 7deg, transparent 7deg 20deg);
+    -webkit-mask:radial-gradient(circle, #000 30%, transparent 72%);
+            mask:radial-gradient(circle, #000 30%, transparent 72%);
+    animation:raySpin 9s linear infinite;
+  }
   .reward-img{
-    display:block; margin:0 auto clamp(10px,1.6vw,18px); max-width:min(52vw,340px);
-    max-height:min(42vh,340px); width:auto; border-radius:26px; object-fit:contain;
-    box-shadow:var(--shadow-lg); border:5px solid #fff; background:#fff;
-    animation:cardpop .5s cubic-bezier(.2,1.4,.5,1);
+    display:block; max-width:min(52vw,340px); max-height:min(42vh,340px);
+    width:auto; border-radius:26px; object-fit:contain;
+    box-shadow:var(--shadow-lg); border:6px solid #fff; background:#fff;
+    transform-origin:50% 60%;
+    animation:rewardIn .85s cubic-bezier(.2,1.5,.45,1) both,
+              rewardWobble 1.8s ease-in-out 1s infinite;
+  }
+  @keyframes raySpin{to{transform:translate(-50%,-50%) rotate(360deg);}}
+  @keyframes rewardIn{
+    0%{transform:scale(.15) rotate(-16deg); opacity:0;}
+    55%{transform:scale(1.2) rotate(8deg); opacity:1;}
+    70%{transform:scale(.94) rotate(-5deg);}
+    85%{transform:scale(1.07) rotate(3deg);}
+    100%{transform:scale(1) rotate(0);}
+  }
+  @keyframes rewardWobble{
+    0%,100%{transform:rotate(-3.5deg) translateY(0);}
+    50%{transform:rotate(3.5deg) translateY(-7px);}
   }
   .reward-hint{font-size:clamp(12px,1.5vw,16px); color:var(--ink-soft); font-weight:700; margin:.2em auto 1em; max-width:26em;}
+  /* burst pieces (ぱんぱかぱーん) */
+  .burst{position:fixed; z-index:30; pointer-events:none; will-change:transform,opacity;}
   @keyframes bob{50%{transform:translateY(-12px) rotate(-4deg);}}
   .celebrate-card button{
     font-family:inherit; font-weight:800; font-size:clamp(16px,2vw,22px); color:#fff;
@@ -282,7 +308,10 @@
   <!-- ================= CELEBRATION ================= -->
   <div id="celebrate" role="dialog" aria-label="おめでとう">
     <div class="celebrate-card">
-      <img id="rewardImg" class="reward-img" alt="ごほうびの え" hidden />
+      <div class="reward-stage" id="rewardStage" hidden>
+        <div class="reward-rays" aria-hidden="true"></div>
+        <img id="rewardImg" class="reward-img" alt="ごほうびの え" />
+      </div>
       <div class="dollstage">
         <svg viewBox="0 0 100 100"><use href="#doll-bunny"/></svg>
         <svg viewBox="0 0 100 100"><use href="#doll-bear"/></svg>
@@ -481,20 +510,29 @@
   // ---- reward image (parent-chosen favourite character, stored on THIS ipad only) ----
   var REWARD_KEY = "natsuyasumi-reward";
   var rewardImg = document.getElementById("rewardImg");
+  var rewardStage = document.getElementById("rewardStage");
   var rewardHint = document.getElementById("rewardHint");
   var dollStage = document.querySelector(".dollstage");
+  var hasReward = false;
   function applyReward(){
     var data = null;
     try{ data = localStorage.getItem(REWARD_KEY); }catch(e){}
+    hasReward = !!data;
     if(data){
-      rewardImg.src = data; rewardImg.hidden = false;
+      rewardImg.src = data; rewardStage.hidden = false;
       rewardHint.hidden = true;
       if(dollStage) dollStage.style.display = "none";
     }else{
-      rewardImg.hidden = true; rewardImg.removeAttribute("src");
+      rewardStage.hidden = true; rewardImg.removeAttribute("src");
       rewardHint.hidden = false;
       if(dollStage) dollStage.style.display = "";
     }
+  }
+  // restart the pop/wobble animation each time it is shown
+  function replayRewardAnim(){
+    if(rewardStage.hidden) return;
+    rewardImg.style.animation = "none"; void rewardImg.offsetWidth;
+    rewardImg.style.animation = "";
   }
   document.getElementById("rewardBtn").addEventListener("click", function(){
     document.getElementById("rewardInput").click();
@@ -535,14 +573,43 @@
   var celebMsg = document.getElementById("celebMsg");
   var celebTitle = celeb.querySelector("h2");
   function celebrate(preview){
-    celebTitle.textContent = preview ? "ごほうび セットしたよ！" : "ぜんぶ できたね！";
-    celebMsg.textContent = preview ? PREVIEW_MSG : DEFAULT_MSG;
+    celebTitle.textContent = preview ? "ごほうび セットしたよ！" : "🎉 ぱんぱかぱーん！ 🎉";
+    celebMsg.textContent = preview ? PREVIEW_MSG : "ぜんぶ できたね！ すごい！";
     celeb.classList.add("show");
-    if(!preview && !reduce) dropConfetti();
+    replayRewardAnim();
+    if(reduce) return;
+    if(!preview) dropConfetti();
+    if(hasReward){ popperBurst(); setTimeout(popperBurst, 420); }
+  }
+  // ぱんぱかぱーん: stars & poppers bursting out from the reward image
+  function popperBurst(){
+    if(rewardStage.hidden) return;
+    var r = rewardStage.getBoundingClientRect();
+    var cx = r.left + r.width/2, cy = r.top + r.height/2;
+    var icons = ["⭐","✨","🎉","💖","🌟","🎊","🎀"];
+    for(var i=0;i<20;i++){
+      (function(i){
+        var s = document.createElement("div");
+        s.className = "burst";
+        s.textContent = icons[i%icons.length];
+        s.style.left = cx + "px"; s.style.top = cy + "px";
+        s.style.fontSize = (18 + Math.random()*22) + "px";
+        var ang = (i/20)*Math.PI*2 + (Math.random()*0.4-0.2);
+        var dist = 150 + Math.random()*180;
+        var dx = Math.cos(ang)*dist, dy = Math.sin(ang)*dist - 30;
+        var rot = (Math.random()*720-360);
+        celeb.appendChild(s);
+        s.animate([
+          {transform:"translate(-50%,-50%) scale(.3) rotate(0deg)", opacity:1},
+          {transform:"translate(calc(-50% + "+dx+"px), calc(-50% + "+dy+"px)) scale(1.25) rotate("+rot+"deg)", opacity:0}
+        ], {duration:900 + Math.random()*600, easing:"cubic-bezier(.12,.7,.3,1)"});
+        setTimeout(function(){ s.remove(); }, 1600);
+      })(i);
+    }
   }
   document.getElementById("celebClose").addEventListener("click", function(){
     celeb.classList.remove("show");
-    var c = celeb.querySelectorAll(".confetti"); c.forEach(function(x){x.remove();});
+    celeb.querySelectorAll(".confetti,.burst").forEach(function(x){x.remove();});
   });
   applyReward();
   function dropConfetti(){
