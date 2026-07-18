@@ -53,14 +53,32 @@
 
   /* ---------- schedule header ---------- */
   .s-head{flex:0 0 auto;}
-  .titlerow{display:flex; align-items:baseline; gap:.6em; flex-wrap:wrap;}
-  .title{font-size:clamp(26px,3.4vw,44px); font-weight:800; margin:0; letter-spacing:.02em; text-wrap:balance;}
-  .title .em{color:var(--coral);}
-  .datechip{
-    font-size:clamp(17px,2.1vw,26px); font-weight:800; color:var(--ink);
-    background:#fff; border:2px solid var(--line); border-radius:999px;
-    padding:.3em 1em; box-shadow:var(--shadow);
+  .titlerow{display:flex; align-items:center; gap:.6em; flex-wrap:wrap;}
+  .title{
+    position:relative; display:inline-block; margin:0; padding-bottom:.18em;
+    font-size:clamp(24px,3vw,40px); font-weight:800; letter-spacing:.01em; line-height:1.05;
+    animation:titlePop .6s cubic-bezier(.2,1.5,.4,1) both;
   }
+  .title .w1{color:#FF9838;}          /* なつやすみ = summer orange */
+  .title .w2{color:var(--coral);}      /* よてい = coral pink */
+  .title .tdeco{font-size:.62em; display:inline-block;}
+  .title .sun{margin-right:.14em; transform-origin:50% 50%; animation:sunSpin 9s linear infinite;}
+  .title .spark{margin-left:.1em; animation:twinkle 1.9s ease-in-out infinite;}
+  .title::after{
+    content:""; position:absolute; left:1.7em; right:1px; bottom:-1px; height:9px;
+    background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='44' height='12' viewBox='0 0 44 12'%3E%3Cpath d='M1 7 q10 -7 21 0 t21 0' fill='none' stroke='%23FFAFC7' stroke-width='3.5' stroke-linecap='round'/%3E%3C/svg%3E") repeat-x;
+    background-size:auto 9px;
+  }
+  @keyframes titlePop{0%{transform:scale(.82) rotate(-2deg); opacity:0;}60%{transform:scale(1.04) rotate(1deg);}100%{transform:scale(1) rotate(0); opacity:1;}}
+  @keyframes sunSpin{to{transform:rotate(360deg);}}
+  @keyframes twinkle{0%,100%{opacity:.35; transform:scale(.8) rotate(0);}50%{opacity:1; transform:scale(1.15) rotate(18deg);}}
+  .datechip{
+    font-size:clamp(14px,1.7vw,20px); font-weight:800; color:var(--ink);
+    background:#fff; border:2px solid var(--line); border-radius:999px;
+    padding:.3em 1em; box-shadow:var(--shadow); white-space:nowrap; margin-left:auto;
+  }
+  .datechip .wd-sun{color:#FF5C6E;}
+  .datechip .wd-sat{color:#4AA3E0;}
   .subtitle{margin:.15em 0 0; font-size:clamp(13px,1.5vw,17px); color:var(--ink-soft); font-weight:700;}
 
   /* ---------- progress meter ---------- */
@@ -356,7 +374,9 @@
   <section class="panel schedule" aria-label="なつやすみのよていひょう">
     <div class="s-head">
       <div class="titlerow">
-        <h1 class="title">なつやすみ <span class="em">よてい</span></h1>
+        <h1 class="title">
+          <span class="tdeco sun" aria-hidden="true">☀️</span><span class="w1">なつやすみ</span> <span class="w2">よてい</span><span class="tdeco spark" aria-hidden="true">✨</span>
+        </h1>
         <span class="datechip" id="datechip">7がつ18にち</span>
       </div>
       <p class="subtitle">たっぷして できたら ちぇっく！ ぜんぶできたら おいわいだよ 🎀</p>
@@ -618,10 +638,15 @@
   try { done = JSON.parse(localStorage.getItem(dayKey) || "{}") || {}; } catch(e){ done = {}; }
   function save(){ try{ localStorage.setItem(dayKey, JSON.stringify(done)); }catch(e){} }
 
-  // ---- date chip ----
-  document.getElementById("datechip").textContent =
-    (now0.getMonth()+1) + "がつ" + now0.getDate() + "にち（" +
-    ["にち","げつ","か","すい","もく","きん","ど"][now0.getDay()] + "）";
+  // ---- date chip (weekend weekday coloured) ----
+  (function(){
+    var dow = now0.getDay();
+    var wd = ["にち","げつ","か","すい","もく","きん","ど"][dow];
+    var cls = dow===0 ? "wd-sun" : (dow===6 ? "wd-sat" : "");
+    document.getElementById("datechip").innerHTML =
+      (now0.getMonth()+1) + "がつ" + now0.getDate() + "にち（" +
+      "<span class=\"" + cls + "\">" + wd + "</span>）";
+  })();
   // ---- build / rebuild the meter dolls and the task list ----
   var dollsRow = document.getElementById("dollsRow");
   var listsEl = document.getElementById("lists");
