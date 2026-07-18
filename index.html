@@ -199,6 +199,7 @@
   .editor-name::placeholder{color:#C9B6AE; font-weight:700;}
   .editor-name:focus{outline:none; border-color:var(--pink); box-shadow:0 0 0 4px #FFE3EC;}
   .editor-name.shake{animation:shake .4s;}
+  .editor-sub{font-size:clamp(15px,1.8vw,19px); font-weight:700; margin-top:2px;}
   @keyframes shake{0%,100%{transform:translateX(0);}20%,60%{transform:translateX(-7px);}40%,80%{transform:translateX(7px);}}
   .editor-label{font-weight:800; color:var(--ink-soft); font-size:clamp(13px,1.5vw,16px); margin:1.1em 0 .55em;}
   .emoji-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(clamp(46px,6vw,60px),1fr)); gap:8px;}
@@ -423,8 +424,12 @@
   <div id="taskEditor" role="dialog" aria-label="よていの へんしゅう">
     <div class="editor-card">
       <h3 id="editorTitle">あたらしい よてい</h3>
+      <label class="editor-label" for="editorName">なまえ</label>
       <input id="editorName" class="editor-name" type="text" maxlength="20"
              placeholder="なまえ（れい: すいえい）" autocomplete="off" />
+      <label class="editor-label" for="editorSub">メモ（ちいさい じ・なくても OK）</label>
+      <input id="editorSub" class="editor-name editor-sub" type="text" maxlength="24"
+             placeholder="れい: しっかり たべよう" autocomplete="off" />
       <div class="editor-label">えもじを えらぶ</div>
       <div class="emoji-grid" id="emojiGrid"></div>
       <div class="editor-actions">
@@ -579,6 +584,11 @@
   var DOLL_IDS = ["doll-bunny","doll-bear","doll-cat","doll-star","doll-heart"];
 
   var TASKS_KEY = "natsuyasumi-tasks-v1";
+  var GORDER = { asa:0, hiru:1, yoru:2 };
+  function sortByGroup(){
+    // stable sort keeps within-group order, so the list & meter follow あさ→おひる→よる
+    TASKS.sort(function(a,b){ return (GORDER[a.grp]||0) - (GORDER[b.grp]||0); });
+  }
   function cloneDefaults(){
     return DEFAULT_TASKS.map(function(t){ return {id:t.id, ic:t.ic, tx:t.tx, sub:t.sub, grp:t.grp}; });
   }
@@ -599,6 +609,7 @@
   }
   function saveTasks(){ try{ localStorage.setItem(TASKS_KEY, JSON.stringify(TASKS)); }catch(e){} }
   var TASKS = loadTasks();
+  sortByGroup(); // fix any previously-saved out-of-order tasks
 
   // ---- storage keyed by date (auto reset each day) ----
   var now0 = new Date();
@@ -772,6 +783,7 @@
                 "🕐","🎀","💖","😊","👍","🌸","🍀","🎉"];
   var editorEl = document.getElementById("taskEditor");
   var editorName = document.getElementById("editorName");
+  var editorSub = document.getElementById("editorSub");
   var emojiGrid = document.getElementById("emojiGrid");
   var editorTitle = document.getElementById("editorTitle");
   var editorState = { emoji:"⭐", cb:null };
@@ -789,6 +801,7 @@
   function openEditor(opts){
     editorTitle.textContent = opts.title;
     editorName.value = opts.name || "";
+    editorSub.value = opts.sub || "";
     editorState.emoji = opts.emoji || "⭐";
     selectEmoji(editorState.emoji);
     editorName.classList.remove("shake");
@@ -803,20 +816,21 @@
       editorName.classList.remove("shake"); void editorName.offsetWidth;
       editorName.classList.add("shake"); editorName.focus(); return;
     }
-    var cb = editorState.cb, em = editorState.emoji;
+    var cb = editorState.cb, em = editorState.emoji, sub = editorSub.value.trim();
     closeEditor();
-    if(cb) cb(name, em);
+    if(cb) cb(name, em, sub);
   }
   document.getElementById("editorOk").addEventListener("click", submitEditor);
   document.getElementById("editorCancel").addEventListener("click", closeEditor);
   editorName.addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); submitEditor(); } });
+  editorSub.addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); submitEditor(); } });
   editorEl.addEventListener("click", function(e){ if(e.target===editorEl) closeEditor(); });
   document.addEventListener("keydown", function(e){ if(e.key==="Escape" && editorEl.classList.contains("show")) closeEditor(); });
 
   function renameTask(id){
     var t = findTask(id); if(!t) return;
-    openEditor({ title:"よていを かえる", name:t.tx, emoji:t.ic, onOk:function(name, em){
-      t.tx = name; t.ic = em;
+    openEditor({ title:"よていを かえる", name:t.tx, sub:t.sub, emoji:t.ic, onOk:function(name, em, sub){
+      t.tx = name; t.ic = em; t.sub = sub;
       saveTasks(); rebuildBoard(); render();
     }});
   }
@@ -828,9 +842,13 @@
   }
   function addTask(grp){
     var g = GROUPS.filter(function(x){ return x.key===grp; })[0];
-    openEditor({ title:"あたらしい よてい（"+(g?g.name:"")+"）", name:"", emoji:"⭐", onOk:function(name, em){
+    openEditor({ title:"あたらしい よてい（"+(g?g.name:"")+"）", name:"", sub:"", emoji:"⭐", onOk:function(name, em, sub){
       var id = "t" + Date.now().toString(36) + Math.floor(Math.random()*1000);
-      TASKS.push({ id:id, ic:em, tx:name, sub:"", grp:grp });
+      // insert at the END OF THIS GROUP (not the end of the whole list),
+      // so the list order and the achievement dolls stay in sight order
+      var rank = GORDER[grp] || 0, insertAt = 0;
+      for(var i=0;i<TASKS.length;i++){ if((GORDER[TASKS[i].grp]||0) <= rank) insertAt = i+1; }
+      TASKS.splice(insertAt, 0, { id:id, ic:em, tx:name, sub:sub, grp:grp });
       saveTasks(); rebuildBoard(); render();
     }});
   }
