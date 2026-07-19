@@ -240,6 +240,30 @@
   .ed-btn.ghost{background:#fff; color:var(--ink-soft);}
   .ed-btn.primary{background:var(--coral); color:#fff; border-color:var(--coral);}
 
+  /* ---------- reward photos manager ---------- */
+  #rewardManager{
+    position:absolute; inset:0; z-index:40; display:none; place-items:center;
+    background:rgba(91,69,80,.38); backdrop-filter:blur(3px); padding:16px;
+  }
+  #rewardManager.show{display:grid; animation:fadein .28s ease;}
+  .rm-hint{font-size:clamp(13px,1.5vw,17px); font-weight:700; color:var(--ink-soft); margin:.2em 0 1em; line-height:1.5;}
+  .rm-grid{
+    display:grid; grid-template-columns:repeat(auto-fill, minmax(clamp(84px,12vw,120px),1fr));
+    gap:12px; min-height:96px;
+  }
+  .rm-empty{grid-column:1/-1; text-align:center; color:var(--ink-soft); font-weight:700;
+    font-size:clamp(14px,1.7vw,18px); padding:1.6em 0; border:3px dashed var(--line); border-radius:18px;}
+  .rm-item{position:relative; aspect-ratio:1/1; border-radius:16px; overflow:hidden;
+    box-shadow:var(--shadow); border:3px solid #fff; background:#FBF3EC;}
+  .rm-item img{width:100%; height:100%; object-fit:cover; display:block;}
+  .rm-del{
+    position:absolute; top:4px; right:4px; width:30px; height:30px; border-radius:50%;
+    border:2px solid #fff; background:#FF6F91; color:#fff; font-size:15px; cursor:pointer;
+    display:grid; place-items:center; padding:0; line-height:1; box-shadow:var(--shadow);
+  }
+  .rm-del:active{transform:scale(.9);}
+  .rm-del:focus-visible{outline:3px solid var(--sky); outline-offset:2px;}
+
   /* ---------- clock panel ---------- */
   .clockpanel{padding:clamp(14px,2vw,28px); align-items:center; justify-content:center; gap:clamp(10px,1.6vw,20px);}
   .sky{
@@ -397,9 +421,9 @@
       <button class="reset" id="editBtn" type="button">✏️ よていを へんしゅう</button>
       <button class="reset" id="soundBtn" type="button">🔊 おと ON</button>
       <button class="reset" id="resetBtn" type="button">🔄 ぜんぶ りせっと</button>
-      <button class="reset" id="rewardBtn" type="button">🖼 ごほうびの え を えらぶ</button>
+      <button class="reset" id="rewardBtn" type="button">🖼 ごほうびの しゃしん</button>
       <button class="reset" id="restoreBtn" type="button">↩️ もとの りすとに もどす</button>
-      <input type="file" id="rewardInput" accept="image/*" hidden />
+      <input type="file" id="rewardInput" accept="image/*" multiple hidden />
     </div>
   </section>
 
@@ -435,7 +459,7 @@
       </div>
       <h2>ぜんぶ できたね！</h2>
       <p id="celebMsg">すごい！ にんぎょうさんたちも よろこんでるよ 🎉</p>
-      <p id="rewardHint" class="reward-hint">したの「🖼 ごほうびの え を えらぶ」で すきな キャラクターを いれると ここに でてくるよ</p>
+      <p id="rewardHint" class="reward-hint">したの「🖼 ごほうびの しゃしん」で すきな キャラクターを いれると、ここに ランダムで でてくるよ</p>
       <button type="button" id="celebClose">やったー！</button>
     </div>
   </div>
@@ -455,6 +479,20 @@
       <div class="editor-actions">
         <button type="button" class="ed-btn ghost" id="editorCancel">やめる</button>
         <button type="button" class="ed-btn primary" id="editorOk">きめた！</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= REWARD PHOTOS MANAGER ================= -->
+  <div id="rewardManager" role="dialog" aria-label="ごほうびの しゃしん">
+    <div class="editor-card">
+      <h3>🖼 ごほうびの しゃしん</h3>
+      <p class="rm-hint">ぜんぶ できたら、この なかから <b>ランダム</b>で 1まい でてくるよ。<br>すきな キャラクターを なんまいでも いれてね（この iPad の なかだけに ほぞん）。</p>
+      <div class="rm-grid" id="rmGrid"></div>
+      <div class="editor-actions">
+        <button type="button" class="ed-btn ghost" id="rmClose">とじる</button>
+        <button type="button" class="ed-btn ghost" id="rmPreview">▶ ためしに みる</button>
+        <button type="button" class="ed-btn primary" id="rmAdd">＋ しゃしんを ついか</button>
       </div>
     </div>
   </div>
@@ -883,21 +921,34 @@
     saveTasks(); rebuildBoard(); render();
   });
 
-  // ---- reward image (parent-chosen favourite character, stored on THIS ipad only) ----
-  var REWARD_KEY = "natsuyasumi-reward";
+  // ---- reward photos: multiple, stored on THIS ipad only, one shown at random on complete ----
+  var REWARDS_KEY = "natsuyasumi-rewards-v1";
+  var OLD_REWARD_KEY = "natsuyasumi-reward";
   var rewardImg = document.getElementById("rewardImg");
   var rewardStage = document.getElementById("rewardStage");
   var rewardHint = document.getElementById("rewardHint");
   var dollStage = document.querySelector(".dollstage");
   var hasReward = false;
+  var rewards = (function(){
+    var arr = [];
+    try{ var raw = localStorage.getItem(REWARDS_KEY); if(raw){ arr = JSON.parse(raw) || []; } }catch(e){ arr = []; }
+    if(!arr || !arr.length){ // migrate an old single reward if present
+      try{
+        var old = localStorage.getItem(OLD_REWARD_KEY);
+        if(old){ arr = [old]; localStorage.setItem(REWARDS_KEY, JSON.stringify(arr)); localStorage.removeItem(OLD_REWARD_KEY); }
+      }catch(e){}
+    }
+    return Array.isArray(arr) ? arr.filter(function(x){ return typeof x==="string" && x; }) : [];
+  })();
+  function saveRewards(){ localStorage.setItem(REWARDS_KEY, JSON.stringify(rewards)); }
+  function pickReward(){ return rewards.length ? rewards[Math.floor(Math.random()*rewards.length)] : null; }
+
   function applyReward(){
-    var data = null;
-    try{ data = localStorage.getItem(REWARD_KEY); }catch(e){}
-    hasReward = !!data;
-    if(data){
-      rewardImg.src = data; rewardStage.hidden = false;
+    hasReward = rewards.length > 0;
+    if(hasReward){
       rewardHint.hidden = true;
       if(dollStage) dollStage.style.display = "none";
+      // the actual image (a random pick) is set in celebrate()
     }else{
       rewardStage.hidden = true; rewardImg.removeAttribute("src");
       rewardHint.hidden = false;
@@ -910,12 +961,8 @@
     rewardImg.style.animation = "none"; void rewardImg.offsetWidth;
     rewardImg.style.animation = "";
   }
-  document.getElementById("rewardBtn").addEventListener("click", function(){
-    document.getElementById("rewardInput").click();
-  });
-  document.getElementById("rewardInput").addEventListener("change", function(ev){
-    var file = ev.target.files && ev.target.files[0];
-    if(!file){ return; }
+  // shrink a chosen file to a small data URL
+  function shrinkFile(file, cb){
     var reader = new FileReader();
     reader.onload = function(){
       var img = new Image();
@@ -925,32 +972,86 @@
         else if(h>=w && h>max){ w = Math.round(w*max/h); h = max; }
         var cv = document.createElement("canvas"); cv.width = w; cv.height = h;
         cv.getContext("2d").drawImage(img,0,0,w,h);
-        var out;
-        try{ out = cv.toDataURL("image/jpeg",0.85); }catch(e){ out = reader.result; }
-        try{
-          localStorage.setItem(REWARD_KEY, out);
-          applyReward();
-          celebrate(true); // preview so the child/parent sees it worked
-        }catch(e){
-          alert("がぞうが おおきすぎるみたい。もっと ちいさい しゃしんで ためしてね。");
-        }
+        var out; try{ out = cv.toDataURL("image/jpeg",0.82); }catch(e){ out = reader.result; }
+        cb(out);
       };
-      img.onerror = function(){ alert("この がぞうは つかえないみたい。べつの しゃしんで ためしてね。"); };
+      img.onerror = function(){ cb(null); };
       img.src = reader.result;
     };
+    reader.onerror = function(){ cb(null); };
     reader.readAsDataURL(file);
+  }
+
+  // reward photos manager dialog
+  var rmEl = document.getElementById("rewardManager");
+  var rmGrid = document.getElementById("rmGrid");
+  var rewardInput = document.getElementById("rewardInput");
+  function renderRewards(){
+    rmGrid.innerHTML = "";
+    if(!rewards.length){
+      var em = document.createElement("div"); em.className = "rm-empty";
+      em.textContent = "まだ しゃしんが ないよ。したの ＋ で いれてね";
+      rmGrid.appendChild(em); return;
+    }
+    rewards.forEach(function(src, idx){
+      var it = document.createElement("div"); it.className = "rm-item";
+      var im = document.createElement("img"); im.src = src; im.alt = "ごほうび " + (idx+1);
+      var del = document.createElement("button");
+      del.type = "button"; del.className = "rm-del"; del.textContent = "×";
+      del.setAttribute("aria-label", "この しゃしんを けす");
+      del.addEventListener("click", function(){
+        rewards.splice(idx, 1);
+        try{ saveRewards(); }catch(e){}
+        applyReward(); renderRewards();
+      });
+      it.appendChild(im); it.appendChild(del);
+      rmGrid.appendChild(it);
+    });
+  }
+  function openManager(){ renderRewards(); rmEl.classList.add("show"); }
+  function closeManager(){ rmEl.classList.remove("show"); }
+  document.getElementById("rewardBtn").addEventListener("click", openManager);
+  document.getElementById("rmClose").addEventListener("click", closeManager);
+  document.getElementById("rmAdd").addEventListener("click", function(){ rewardInput.click(); });
+  document.getElementById("rmPreview").addEventListener("click", function(){
+    if(!rewards.length) return;
+    closeManager(); celebrate(true);
+  });
+  rmEl.addEventListener("click", function(e){ if(e.target===rmEl) closeManager(); });
+  document.addEventListener("keydown", function(e){ if(e.key==="Escape" && rmEl.classList.contains("show")) closeManager(); });
+  rewardInput.addEventListener("change", function(ev){
+    var files = [].slice.call(ev.target.files || []);
+    if(!files.length) return;
+    var remaining = files.length, quota = false, fail = false;
+    files.forEach(function(f){
+      shrinkFile(f, function(out){
+        if(out){
+          rewards.push(out);
+          try{ saveRewards(); }catch(e){ rewards.pop(); quota = true; }
+        }else{ fail = true; }
+        if(--remaining === 0){
+          applyReward(); renderRewards();
+          if(quota) alert("しゃしんが おおくて、ぜんぶは ほぞんできなかったみたい。いくつか けしてね。");
+          else if(fail) alert("つかえない がぞうが あったよ。べつの しゃしんで ためしてね。");
+        }
+      });
+    });
     ev.target.value = "";
   });
 
   // ---- celebration ----
   var DEFAULT_MSG = "すごい！ にんぎょうさんたちも よろこんでるよ 🎉";
-  var PREVIEW_MSG = "この えが ごほうびだよ！ ぜんぶ できたら でてくるよ ✨";
+  var PREVIEW_MSG = "ぜんぶ できたら、この なかから ランダムで でてくるよ ✨";
   var celeb = document.getElementById("celebrate");
   var celebMsg = document.getElementById("celebMsg");
   var celebTitle = celeb.querySelector("h2");
   function celebrate(preview){
     celebTitle.textContent = preview ? "ごほうび セットしたよ！" : "🎉 ぱんぱかぱーん！ 🎉";
     celebMsg.textContent = preview ? PREVIEW_MSG : "ぜんぶ できたね！ すごい！";
+    if(hasReward){ // show one photo at random
+      var src = pickReward();
+      if(src){ rewardImg.src = src; rewardStage.hidden = false; }
+    }
     celeb.classList.add("show");
     replayRewardAnim();
     if(preview){ Sound.sparkle(); } else { Sound.fanfare(); }
